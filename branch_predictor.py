@@ -56,6 +56,9 @@ class Smith(BranchPredictor):
         """
         return 0
 
+    def get_counter(self):
+        return self.prediction_table[0]
+
 
 class Bimodal(BranchPredictor):
     """
