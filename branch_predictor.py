@@ -405,7 +405,7 @@ def load_instructions(filename: str) -> List[Tuple[int, bool]]:
     return instructions
         
 
-def run_predictor(predictor: BranchPredictor, filename: str) -> Tuple[int, int]:
+def run_predictor(predictor: BranchPredictor, filename: str, return_detailed_output: bool = False) -> Tuple[int, int]:
     """
     Given an instance of a predictor and the filename of a trace file,
     runs all the branch instructions from the trace file through the predictor
@@ -415,9 +415,25 @@ def run_predictor(predictor: BranchPredictor, filename: str) -> Tuple[int, int]:
     num_predictions = len(instructions)
     num_mispredictions = 0
 
+    if return_detailed_output:
+        detailed_output = {
+            (False, False): 0,
+            (False, True): 0,
+            (True, False): 0,
+            (True, True): 0
+        } 
+
     for address, branch_is_taken in instructions:
         prediction_is_correct = predictor.make_prediction(address, branch_is_taken)
         if not prediction_is_correct:
             num_mispredictions += 1
-    
+
+        if detailed_output:
+            actual = branch_is_taken
+            predicted = prediction_is_correct == branch_is_taken
+            detailed_output[(actual, predicted)] += 1
+
+    if detailed_output:
+        return num_predictions, num_mispredictions, detailed_output
+
     return num_predictions, num_mispredictions
