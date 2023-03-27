@@ -55,13 +55,13 @@ for i, trace_file in enumerate(trace_files):
 
     ### GShare ###
     for m in tqdm(range(2, 17, 2), desc=f'GShare {current_trace_file} of {num_trace_files}'):
-        for n in range(2, 11, 2):
+        for n in range(2, m + 1, 2):
             run_benchmark(trace_file, GShare, "GShare", (m, n), output_file)
 
     ### Hybrid ###
     for k in tqdm(range(2, 11, 4), desc=f'Hybrid {current_trace_file} of {num_trace_files}'):
         for m_gshare in range(2, 17, 4):
-            for n in range(2, 11, 4):
+            for n in range(2, m_gshare + 1, 4):
                 for m_bimodal in range(2, 17, 4):
                     run_benchmark(trace_file, Hybrid, "Hybrid", (k, m_gshare, n, m_bimodal), output_file)
 
