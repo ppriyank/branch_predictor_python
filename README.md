@@ -50,21 +50,19 @@ python gshare.py 11 5 traces/jpeg_trace.txt
 ```
 
 
-
-
-### ToDO
+### Streaming Algorithms
     - https://arxiv.org/pdf/2007.10781.pdf
-    
+
+`chameleon_cluster`: Doesnt seem be to totally online     
+
     - https://github.com/Moonpuck/chameleon_cluster/blob/1c0a65ee6a79706e4d415dd7ca78da5d3c29906d/chameleon.py#L80
-    
-    - https://scikit-learn.org/stable/modules/generated/sklearn.cluster.MiniBatchKMeans.html#sklearn.cluster.MiniBatchKMeans
-    
+
+### ToDO    
     - https://pypi.org/project/clusopt-core/
     
-    - https://github.com/waylongo/denstream/blob/master/codes/DenStream.py
-
     - https://github.com/ruteee/SOStream/blob/master/notebooks/SOStream%20Teste.ipynb
 
     - https://github.com/online-ml/river
-    
 
+    - Wrong Pendalty = -2
+    - Correct Reward = 1
