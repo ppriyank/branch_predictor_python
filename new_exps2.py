@@ -6,6 +6,18 @@ from sklearn.cluster import MiniBatchKMeans
 import numpy as np 
 import random 
 
+# from clusopt_core.cluster import CluStream
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+import pickle
+plt.rcParams['xtick.labelsize'] = 16
+plt.rcParams['ytick.labelsize'] = 16
+plt.rcParams['font.size'] = 16
+plt.rcParams["legend.labelcolor"] = "black"
+plt.rcParams["legend.edgecolor"] = "black"
+plt.fig.subplots_adjust() 
+plt.figure(figsize=(10, 10))
+
 from MicroCluster import DenStream, DenStream2, DenStream3
 random.seed(1)
 
@@ -150,6 +162,60 @@ class DenStream_Algo2():
 		print("====")
 		print(f"Number of p_micro_clusters is {len(self.centers)}")
 		print("====")	
+
+class clusopt():
+	# https://pypi.org/project/clusopt-core/
+	def __init__(self, **args):
+		import pdb
+		pdb.set_trace()
+		self.clusterer = DenStream3()
+		
+		self.default_pred = True
+
+	def make_prediction(self, address, branch_is_taken):
+
+		address = vectorize(address)
+
+		predictions = self.clusterer.predict(address)
+		self.clusterer.partial_fit(address, branch_is_taken)
+
+		if predictions == None:
+			predictions = self.default_pred
+
+		return predictions == branch_is_taken
+	
+	def finish(self, num_predictions):
+		print("====")
+		print(f"Number of p_micro_clusters is {len(self.centers)}")
+		print("====")	
+
+class Plot():
+	# https://pypi.org/project/clusopt-core/
+	def __init__(self, **args):
+		from sklearn.manifold import TSNE
+		
+		self.tsne = TSNE(n_components=2, random_state=0)
+		self.data = []
+
+	def make_prediction(self, address, branch_is_taken):
+
+		address = vectorize(address)
+		self.data.append(address)
+		return False
+	
+	def finish(self, num_predictions):
+		import pdb
+		pdb.set_trace()
+		self.data = np.concatenate(self.data, axis=0)
+		X = self.tsne.fit_transform(self.data)
+		saved_obj = dict(
+		        X = X,
+	    )
+	    with open(file_name, 'wb') as f:
+	        pickle.dump(saved_obj, f)    
+
+		
+
 
 
 def load_instructions(filename: str) -> List[Tuple[int, bool]]:

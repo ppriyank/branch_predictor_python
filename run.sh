@@ -35,7 +35,7 @@ python new_exps2.py --algorithm_name="S_Kmeans2" \
 5: 49.37
 6: 48.94
 
-srun --pty -t2:00:00 --cpus-per-task=6 bash
+srun --pty -t2:00:00 --cpus-per-task=10 bash
 python new_exps2.py --algorithm_name="DenStream_Algo" \
 --trace_file="traces/gcc_trace.txt" 
 # number of predictions:          2000000
@@ -47,7 +47,6 @@ python new_exps2.py --algorithm_name="DenStream_Algo" \
 # ====
 
 
-python new_exps2.py --algorithm_name="DenStream_Algo2" \
---trace_file="traces/gcc_trace.txt" 
+python new_exps2.py --algorithm_name="Plot" --trace_file="traces/gcc_trace.txt" 
 
 

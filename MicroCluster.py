@@ -447,7 +447,8 @@ class DenStream3():
             self.insert_centers(sample, y)
         else:
             if dist < self.epsilon:
-                center =self.centers.pop(index)
+
+                center =self.centers[index]
                 N = center.count
                 C = center.coordinate
                 M = ((C * N) + sample) / (N+1)
@@ -455,8 +456,6 @@ class DenStream3():
                 center.count = N+1
                 center.coordinate = M 
                 center.labels[y] += 1
-                self.centers.append(center)
-
             else:
                 self.insert_centers(sample, y)
                 
