@@ -1,4 +1,4 @@
-Tracefile,Predictor,Predictor Arguments,Misprediction Rate,Accuracy,Precision,Recall,Fl,Runtime
+Tracefile,Predictor,Predictor Arguments,Misprediction Rate,Accuracy,Precision,Recall,F1,Runtime
 gcc_trace.txt,Smith,"1",45.24,0.5476,0.5442,0.5442,0.5442,12.5
 gcc_trace.txt,Smith,"2",43.01,0.5699,0.5683,0.5547,0.5614,12.6
 gcc_trace.txt,Smith,"3",41.57,0.5843,0.5890,0.5369,0.5617,12.7

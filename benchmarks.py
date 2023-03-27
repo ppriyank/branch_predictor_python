@@ -7,7 +7,7 @@ trace_files = 'gcc_trace.txt', 'jpeg_trace.txt', 'perl_trace.txt'
 num_trace_files = len(trace_files)
 output_file = 'benchmarks.csv'
 
-headers = ['Tracefile', 'Predictor', 'Predictor Arguments', 'Misprediction Rate', 'Accuracy', 'Precision', 'Recall', 'Fl', 'Runtime']
+headers = ['Tracefile', 'Predictor', 'Predictor Arguments', 'Misprediction Rate', 'Accuracy', 'Precision', 'Recall', 'F1', 'Runtime']
 if not os.path.isfile(output_file):
     header_line = ','.join(headers)
     with open(output_file, 'w') as f:
