@@ -6,7 +6,7 @@ from sklearn.cluster import MiniBatchKMeans
 import numpy as np 
 import random 
 
-from MicroCluster import DenStream, DenStream2
+from MicroCluster import DenStream, DenStream2, DenStream3
 random.seed(1)
 
 
@@ -127,6 +127,30 @@ class DenStream_Algo():
 		print(f"Number of o_micro_clusters is {len(self.clusterer.o_micro_clusters)}")
 		print("====")	
 
+class DenStream_Algo2():
+	# https://github.com/waylongo/denstream/blob/master/codes/DenStream.py
+	def __init__(self, **args):
+		self.clusterer = DenStream3()
+		
+		self.default_pred = True
+
+	def make_prediction(self, address, branch_is_taken):
+
+		address = vectorize(address)
+
+		predictions = self.clusterer.predict(address)
+		self.clusterer.partial_fit(address, branch_is_taken)
+
+		if predictions == None:
+			predictions = self.default_pred
+
+		return predictions == branch_is_taken
+	
+	def finish(self, num_predictions):
+		print("====")
+		print(f"Number of p_micro_clusters is {len(self.centers)}")
+		print("====")	
+
 
 def load_instructions(filename: str) -> List[Tuple[int, bool]]:
     """
@@ -160,7 +184,8 @@ def run_predictor(predictor, filename: str, return_detailed_output: bool = False
             (True, True): 0
         } 
 
-    for address, branch_is_taken in instructions:
+    for i, (address, branch_is_taken) in enumerate(instructions):
+        print(i / num_predictions, end="\r")
         prediction_is_correct = predictor.make_prediction(address, branch_is_taken)
         if not prediction_is_correct:
             num_mispredictions += 1

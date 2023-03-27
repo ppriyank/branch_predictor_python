@@ -279,7 +279,6 @@ class DenStream:
                                      o_micro_cluster.weight() >= Xi]
         self.t += 1
 
-
     def _validate_sample_weight(self, sample_weight, n_samples):
         """Set the sample weight array."""
         if sample_weight is None:
@@ -409,3 +408,65 @@ class DenStream2(DenStream):
                 micro_cluster = MicroCluster2(self.lambd, self.t)
                 micro_cluster.insert_sample(sample, y, weight)
                 self.o_micro_clusters.append(micro_cluster)
+
+
+
+class POINT:
+    def __init__(self, coordinate=None, label={False:0 , True:0}, count=1):
+        self.labels = label
+        self.coordinate = coordinate
+        self.count = count
+
+class DenStream3():
+    def __init__(self, ):
+        self.centers = [] 
+        self.epsilon = 0.3
+    
+    def _get_nearest_micro_cluster(self, X):
+        if len(self.centers) == 0:
+            return -1, None
+        min_distance = 10
+        min_distance_index = -1
+
+        for i,point in enumerate(self.centers):
+            dist = ((point.coordinate - X ) ** 2).sum()
+            if dist < min_distance:
+                min_distance = dist
+                min_distance_index = i
+        return min_distance_index, min_distance
+
+    def insert_centers(self, sample, y):
+        label = {True:0, False:0}
+        label[y] += 1
+        point = POINT(sample, label)
+        self.centers.append(point)
+
+    def partial_fit(self, sample, y):
+        index, dist = self._get_nearest_micro_cluster(sample)
+        if index == -1:
+            self.insert_centers(sample, y)
+        else:
+            if dist < self.epsilon:
+                center =self.centers.pop(index)
+                N = center.count
+                C = center.coordinate
+                M = ((C * N) + sample) / (N+1)
+                
+                center.count = N+1
+                center.coordinate = M 
+                center.labels[y] += 1
+                self.centers.append(center)
+
+            else:
+                self.insert_centers(sample, y)
+                
+    def predict(self, X):
+        
+        if self.centers == []:
+            return None
+
+        index , dist = self._get_nearest_micro_cluster(X)
+        labels = self.centers[index].labels
+        y = labels[True] >= labels[False]
+        return y
+
