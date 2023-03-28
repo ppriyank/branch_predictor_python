@@ -13,9 +13,9 @@ import pickle
 plt.rcParams['xtick.labelsize'] = 16
 plt.rcParams['ytick.labelsize'] = 16
 plt.rcParams['font.size'] = 16
-plt.rcParams["legend.labelcolor"] = "black"
-plt.rcParams["legend.edgecolor"] = "black"
-plt.fig.subplots_adjust() 
+# plt.rcParams["legend.labelcolor"] = "black"
+# plt.rcParams["legend.edgecolor"] = "black"
+# plt.fig.subplots_adjust() 
 plt.figure(figsize=(10, 10))
 
 from MicroCluster import DenStream, DenStream2, DenStream3
@@ -196,26 +196,88 @@ class Plot():
 		
 		self.tsne = TSNE(n_components=2, random_state=0)
 		self.data = []
-
+		self.labels = [] 
+	
 	def make_prediction(self, address, branch_is_taken):
 
 		address = vectorize(address)
 		self.data.append(address)
+		self.labels.append(branch_is_taken)
+
 		return False
 	
-	def finish(self, num_predictions):
+	def finish(self, num_predictions, file_name="chikka.pkl"):
+		self.data = np.concatenate(self.data, axis=0)
+		self.labels = np.array(self.labels)
 		import pdb
 		pdb.set_trace()
-		self.data = np.concatenate(self.data, axis=0)
 		X = self.tsne.fit_transform(self.data)
-		saved_obj = dict(
-		        X = X,
-	    )
-	    with open(file_name, 'wb') as f:
-	        pickle.dump(saved_obj, f)    
+		saved_obj = dict(X = X, Y=self.labels)
+		with open(file_name, 'wb') as f:
+			pickle.dump(saved_obj, f)    
+		# plt.clf()  
+  #   	plt.grid(alpha=0.5)
+  #   	color_class1 = {0:"black" , 1:"red"}
+	 #    for i,cl in enumerate({0, 1}):
+	 #        if cl == 'controlled' :
+	 #            color = color_class1
+	 #        else:
+	 #            color = color_class2
+	 #        indices = conditions == cl
+	 #        vals = X[indices]
+	 #        subs = subjects[indices]
+	 #        print(indices.sum(), vals)
+	 #        # scatter_plot = plt.scatter(vals[:,0], vals[:,1], color=colors[i], alpha=alphas[s], label=cl)
+	 #        for k,s in enumerate(sub_ids):
+	 #            subset_index = subs == s
+	 #            # vals = vals / np.linalg.norm(vals, axis=1).reshape(-1, 1)
+	 #            scatter_plot = plt.scatter(vals[subset_index,0], vals[subset_index,1], color=color[k], alpha=alpha)
+	 #            # plt.colorbar(label="Like/Dislike Ratio")
+	 #    # plt.legend()
+	 #    plt.title(f"t-SNE Plot : Controlled vs Treatment")
+	 #    plt.savefig("fig1.png")
+	 #    plt.clf()  
 
+		# import pdb
+		# pdb.set_trace()
 		
-
+class Plot2(Plot):
+	# https://pypi.org/project/clusopt-core/
+	def __init__(self, **args):
+		from sklearn.decomposition import PCA
+		self.pca = PCA(n_components=2)
+		self.data = []
+		self.labels = [] 
+		
+	def finish(self, num_predictions, file_name="PCA.pkl"):
+		if os.path.exists(file_name):
+			with open(file_name, 'rb') as f:
+				saved_obj = pickle.load(f)    
+			X = saved_obj["X"]
+			Y = saved_obj["Y"]
+		else:
+			self.data = np.concatenate(self.data, axis=0)
+			self.labels = np.array(self.labels)
+			X = self.pca.fit_transform(self.data)
+			Y = self.labels
+			saved_obj = dict(X = X, Y=self.labels)
+			with open(file_name, 'wb') as f:
+				pickle.dump(saved_obj, f)    
+		
+		plt.clf()
+		plt.grid(alpha=0.5)
+		color_class = {0:"black" , 1:"red"}
+		Y= Y * 1.0
+		for i,cl in enumerate({0, 1}):
+			color = color_class[cl]
+			indices = Y == cl
+			vals = X[indices]
+			lab = Y[indices]
+			scatter_plot = plt.scatter(vals[:,0], vals[:,1], color=color, alpha=0.1, label=cl)
+		plt.legend()
+		plt.title(f"PCA Plot")
+		plt.savefig("fig1.png")
+		plt.clf()  
 
 
 def load_instructions(filename: str) -> List[Tuple[int, bool]]:

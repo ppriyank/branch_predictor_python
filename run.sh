@@ -49,4 +49,7 @@ python new_exps2.py --algorithm_name="DenStream_Algo" \
 
 python new_exps2.py --algorithm_name="Plot" --trace_file="traces/gcc_trace.txt" 
 
+python new_exps2.py --algorithm_name="Plot2" --trace_file="traces/gcc_trace.txt" 
+
+
 
