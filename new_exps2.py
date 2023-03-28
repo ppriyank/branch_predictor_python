@@ -163,31 +163,62 @@ class DenStream_Algo2():
 		print(f"Number of p_micro_clusters is {len(self.centers)}")
 		print("====")	
 
-class clusopt():
-	# https://pypi.org/project/clusopt-core/
-	def __init__(self, **args):
-		import pdb
-		pdb.set_trace()
-		self.clusterer = DenStream3()
-		
+class Nearest_Neighbour():
+	def __init__(self, past=None, dim=22, k=5):
 		self.default_pred = True
+		self.centers = [float(self.default_pred) for i in range(past)] 
+		self.distances = np.array([[0 for i in range(dim)] for j in range(past)])
+		self.past = past
+		self.k = k 
 
 	def make_prediction(self, address, branch_is_taken):
-
+		
+		prediction = self.default_pred
 		address = vectorize(address)
+		
+		dist = ((address - self.distances) ** 2).sum(-1)
+		ordered = np.argsort(dist)
+		# sorted_neigh = sorted(dist, key=lambda x: x[1])[:n_neighbors]
 
-		predictions = self.clusterer.predict(address)
-		self.clusterer.partial_fit(address, branch_is_taken)
+		self.distances = self.distances[1:]
+		self.centers.pop(0)
 
-		if predictions == None:
-			predictions = self.default_pred
-
-		return predictions == branch_is_taken
+		self.distances = np.append(self.distances, address, axis=0)
+		self.centers.append(branch_is_taken * 1.0)
+		
+		
+		return prediction == branch_is_taken
 	
 	def finish(self, num_predictions):
 		print("====")
-		print(f"Number of p_micro_clusters is {len(self.centers)}")
+		print(f"Buffer:  {self.centers}")
 		print("====")	
+
+# class clusopt():
+# 	# https://pypi.org/project/clusopt-core/
+# 	def __init__(self, **args):
+# 		import pdb
+# 		pdb.set_trace()
+# 		self.clusterer = DenStream3()
+		
+# 		self.default_pred = True
+
+# 	def make_prediction(self, address, branch_is_taken):
+
+# 		address = vectorize(address)
+
+# 		predictions = self.clusterer.predict(address)
+# 		self.clusterer.partial_fit(address, branch_is_taken)
+
+# 		if predictions == None:
+# 			predictions = self.default_pred
+
+# 		return predictions == branch_is_taken
+	
+# 	def finish(self, num_predictions):
+# 		print("====")
+# 		print(f"Number of p_micro_clusters is {len(self.centers)}")
+# 		print("====")	
 
 class Plot():
 	# https://pypi.org/project/clusopt-core/

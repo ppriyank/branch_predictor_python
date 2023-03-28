@@ -51,5 +51,12 @@ python new_exps2.py --algorithm_name="Plot" --trace_file="traces/gcc_trace.txt"
 
 python new_exps2.py --algorithm_name="Plot2" --trace_file="traces/gcc_trace.txt" 
 
+python new_exps2.py --algorithm_name="Nearest_Neighbour" --trace_file="traces/gcc_trace.txt" --additional_args past=20 k=7
+# number of predictions:          2000000
+# number of mispredictions:       1007535
+# misprediction rate:             50.38%
+# ====
+# Buffer:  [1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0]
+# ==
 
 
