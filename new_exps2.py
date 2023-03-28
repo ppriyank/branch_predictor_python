@@ -167,56 +167,54 @@ class DenStream_Algo2():
 class SOS_Cluster():
 	def __init__(self, past=None, dim=22, k=5):
 		from SOStream.sostream import SOStream
-		sostream_clustering = SOStream(alpha = 0, min_pts = 3, merge_threshold = 50000)
+		self.sostream_clustering = SOStream(alpha = 0, min_pts = 3, merge_threshold = 50000)
+		self.default_pred = True
 
 	def make_prediction(self, address, branch_is_taken):
 		
-		prediction = self.default_pred
 		address = vectorize(address)
-		
-		dist = ((address - self.distances) ** 2).sum(-1)
-		ordered = np.argsort(dist)
-		# sorted_neigh = sorted(dist, key=lambda x: x[1])[:n_neighbors]
 
-		self.distances = self.distances[1:]
-		self.centers.pop(0)
+		prediction=  self.sostream_clustering.predict(address)
+		if prediction is None:
+			prediction = True
+			
 
-		self.distances = np.append(self.distances, address, axis=0)
-		self.centers.append(branch_is_taken * 1.0)
-		
+		label = (branch_is_taken * 1.0 - 0.5 ) * 2
+		self.sostream_clustering.process(address, label)
 		
 		return prediction == branch_is_taken
+		
 	
 	def finish(self, num_predictions):
 		print("====")
-		print(f"Buffer:  {self.centers}")
+		print(f"Buffer:  {len(self.sostream_clustering.M)}")
 		print("====")	
 
-# class clusopt():
-# 	# https://pypi.org/project/clusopt-core/
-# 	def __init__(self, **args):
-# 		import pdb
-# 		pdb.set_trace()
-# 		self.clusterer = DenStream3()
+class clusopt():
+	# https://pypi.org/project/clusopt-core/
+	def __init__(self, **args):
+		import pdb
+		pdb.set_trace()
+		self.clusterer = DenStream3()
 		
-# 		self.default_pred = True
+		self.default_pred = True
 
-# 	def make_prediction(self, address, branch_is_taken):
+	def make_prediction(self, address, branch_is_taken):
 
-# 		address = vectorize(address)
+		address = vectorize(address)
 
-# 		predictions = self.clusterer.predict(address)
-# 		self.clusterer.partial_fit(address, branch_is_taken)
+		predictions = self.clusterer.predict(address)
+		self.clusterer.partial_fit(address, branch_is_taken)
 
-# 		if predictions == None:
-# 			predictions = self.default_pred
+		if predictions == None:
+			predictions = self.default_pred
 
-# 		return predictions == branch_is_taken
+		return predictions == branch_is_taken
 	
-# 	def finish(self, num_predictions):
-# 		print("====")
-# 		print(f"Number of p_micro_clusters is {len(self.centers)}")
-# 		print("====")	
+	def finish(self, num_predictions):
+		print("====")
+		print(f"Number of p_micro_clusters is {len(self.centers)}")
+		print("====")	
 
 class Plot():
 	# https://pypi.org/project/clusopt-core/

@@ -59,7 +59,7 @@ python new_exps2.py --algorithm_name="Nearest_Neighbour" --trace_file="traces/gc
 # Buffer:  [1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0]
 # ==
 
-python new_exps2.py --algorithm_name="SOS_Cluster" \
---trace_file="traces/gcc_trace.txt" --additional_args past=20 k=7
+python new_exps2.py --algorithm_name="SOS_Cluster" --trace_file="traces/gcc_trace.txt" 
+
 
 
