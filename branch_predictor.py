@@ -191,7 +191,7 @@ class Hybrid:
 class YehPatt(BranchPredictor):
     def __init__(self, m: int, n: int) -> None:
         super().__init__(n)
-        self.history_table = np.full(2 ** m, self.threshold)
+        self.history_table = np.zeros(2 ** m, dtype=int)
         self.rightmost_m_bits = 2 ** m - 1
         self.nth_bit_from_the_right = 1 << (n-1)
 
@@ -428,12 +428,12 @@ def run_predictor(predictor: BranchPredictor, filename: str, return_detailed_out
         if not prediction_is_correct:
             num_mispredictions += 1
 
-        if detailed_output:
+        if return_detailed_output:
             actual = branch_is_taken
             predicted = prediction_is_correct == branch_is_taken
             detailed_output[(actual, predicted)] += 1
 
-    if detailed_output:
+    if return_detailed_output:
         return num_predictions, num_mispredictions, detailed_output
 
     return num_predictions, num_mispredictions
