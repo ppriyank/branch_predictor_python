@@ -165,6 +165,7 @@ class DenStream_Algo2():
 		print("====")	
 
 class SOS_Cluster():
+	# https://github.com/ruteee/SOStream/blob/master/notebooks/SOStream%20Teste.ipynb
 	def __init__(self, past=None, dim=22, k=5):
 		from SOStream.sostream import SOStream
 		self.sostream_clustering = SOStream(alpha = 0, min_pts = 3, merge_threshold = 50000)
@@ -335,6 +336,64 @@ class Nearest_Neighbour():
 	def finish(self, num_predictions):
 		print("====")
 		print(f"Buffer:  {self.centers}")
+		print("====")	
+
+class River_log():
+	# pip install pep517 jsonpatch
+	# pip install git+https://github.com/online-ml/river --upgrade
+	# https://github.com/online-ml/river
+	
+	def __init__(self, category="None", dim=22):
+		from river import compose, linear_model, metrics, preprocessing, forest
+		# river/river/forest/
+		self.dim = dim
+		self.default_pred = True
+
+		self.vectorize_fn = self.vectorize2
+		self.metric = metrics.Accuracy()
+		# metric = metrics.MacroF1()
+		if category == "logistic":
+			self.model = compose.Pipeline(linear_model.LogisticRegression())
+		elif category == "Perceptron":
+			self.model = compose.Pipeline(linear_model.Perceptron())
+		elif category == "ALMA":
+			self.model = compose.Pipeline(linear_model.ALMAClassifier())
+		elif category == "ARFClassifier":
+			self.vectorize_fn = self.vectorize
+			self.model = compose.Pipeline(
+				# preprocessing.StandardScaler(),
+				forest.ARFClassifier()
+			)
+		elif category == "AMFClassifier":
+			self.vectorize_fn = self.vectorize
+			self.model = compose.Pipeline(
+				# preprocessing.StandardScaler(),
+				forest.AMFClassifier()
+			)		
+		# preprocessing.StandardScaler(),
+	def vectorize(self, address, no_normalize=True):
+		addr = bin(address)[2:]
+		addr = {i: int(addr[i]) for i in range(self.dim)}
+		return addr
+
+	def vectorize2(self, address, no_normalize=True):
+		addr = bin(address)[2:]
+		addr = [int(e) for e in addr]
+		denom = sum(addr) ** 0.5
+		addr = {i: addr[i] / denom for i in range(self.dim)}
+		return addr
+
+	def make_prediction(self, address, branch_is_taken):
+		
+		address = self.vectorize_fn(address)
+		prediction = self.model.predict_proba_one(address)
+		pred = prediction[True] > prediction[False]
+		
+		self.model.learn_one(address, branch_is_taken)
+
+		return pred == branch_is_taken
+	
+	def finish(self, num_predictions):
 		print("====")	
 
 

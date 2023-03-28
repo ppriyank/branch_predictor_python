@@ -62,4 +62,11 @@ python new_exps2.py --algorithm_name="Nearest_Neighbour" --trace_file="traces/gc
 python new_exps2.py --algorithm_name="SOS_Cluster" --trace_file="traces/gcc_trace.txt" 
 
 
+python new_exps2.py --algorithm_name="River_log" --trace_file="traces/gcc_trace.txt" \
+--additional_args category="ARFClassifier"
+
+# number of predictions:		2000000
+# number of mispredictions:	815634
+# misprediction rate:		40.78%
+# ====
 

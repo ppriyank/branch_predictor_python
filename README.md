@@ -58,10 +58,5 @@ python gshare.py 11 5 traces/jpeg_trace.txt
     - https://github.com/Moonpuck/chameleon_cluster/blob/1c0a65ee6a79706e4d415dd7ca78da5d3c29906d/chameleon.py#L80
 
 ### ToDO    
-    
-    - https://github.com/ruteee/SOStream/blob/master/notebooks/SOStream%20Teste.ipynb
-
-    - https://github.com/online-ml/river
-
     - Wrong Pendalty = -2
     - Correct Reward = 1
