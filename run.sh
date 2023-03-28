@@ -36,6 +36,8 @@ python new_exps2.py --algorithm_name="S_Kmeans2" \
 6: 48.94
 
 srun --pty -t2:00:00 --cpus-per-task=10 bash
+conda activate pathak
+
 python new_exps2.py --algorithm_name="DenStream_Algo" \
 --trace_file="traces/gcc_trace.txt" 
 # number of predictions:          2000000
@@ -63,7 +65,7 @@ python new_exps2.py --algorithm_name="SOS_Cluster" --trace_file="traces/gcc_trac
 
 
 python new_exps2.py --algorithm_name="River_log" --trace_file="traces/gcc_trace.txt" \
---additional_args category="ARFClassifier"
+--additional_args category="ExtremelyFastDecisionTreeClassifier"
 
 # number of predictions:		2000000
 # number of mispredictions:	815634

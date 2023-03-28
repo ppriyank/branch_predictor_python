@@ -2,7 +2,7 @@ import argparse
 from mmcv import DictAction
 from typing import List, Tuple
 import os 
-from sklearn.cluster import MiniBatchKMeans
+import functools
 import numpy as np 
 import random 
 
@@ -344,7 +344,9 @@ class River_log():
 	# https://github.com/online-ml/river
 	
 	def __init__(self, category="None", dim=22):
-		from river import compose, linear_model, metrics, preprocessing, forest
+		from river import (
+			compose, linear_model, metrics, preprocessing, forest, 
+			ensemble, model_selection, tree, naive_bayes, neighbors, utils)
 		# river/river/forest/
 		self.dim = dim
 		self.default_pred = True
@@ -352,25 +354,43 @@ class River_log():
 		self.vectorize_fn = self.vectorize2
 		self.metric = metrics.Accuracy()
 		# metric = metrics.MacroF1()
+		# metric=metrics.ROCAUC()
 		if category == "logistic":
 			self.model = compose.Pipeline(linear_model.LogisticRegression())
 		elif category == "Perceptron":
 			self.model = compose.Pipeline(linear_model.Perceptron())
 		elif category == "ALMA":
 			self.model = compose.Pipeline(linear_model.ALMAClassifier())
-		elif category == "ARFClassifier":
+		# elif category == "ARFClassifier":
+		# 	# self.vectorize_fn = self.vectorize
+		# 	self.model = compose.Pipeline(
+		# 		preprocessing.StandardScaler(),
+		# 		# forest.ARFClassifier(seed=8, leaf_prediction="mc")
+		# 		forest.ARFClassifier()
+		# 	)
+		# elif category == "AMFClassifier":
+			# self.vectorize_fn = self.vectorize
+			# self.model = compose.Pipeline(#preprocessing.StandardScaler(),
+			# forest.AMFClassifier())		
+		elif category == "HoeffdingAdaptiveTreeClassifier":
+			self.model = compose.Pipeline(tree.HoeffdingAdaptiveTreeClassifier())
+		elif category == "GaussianNB":
 			self.vectorize_fn = self.vectorize
-			self.model = compose.Pipeline(
-				# preprocessing.StandardScaler(),
-				forest.ARFClassifier()
-			)
-		elif category == "AMFClassifier":
+			self.model = compose.Pipeline(naive_bayes.GaussianNB())
+		# elif category == "KNNClassifier":
+		# 	self.model = compose.Pipeline(neighbors.KNNClassifier(window_size=50,
+     	# 		distance_func=functools.partial(utils.math.minkowski_distance, p=1)))
+		elif category == "ExtremelyFastDecisionTreeClassifier":
 			self.vectorize_fn = self.vectorize
-			self.model = compose.Pipeline(
-				# preprocessing.StandardScaler(),
-				forest.AMFClassifier()
-			)		
+			self.model = compose.Pipeline(tree.ExtremelyFastDecisionTreeClassifier(leaf_prediction='mc', max_depth=10))
+		# elif category == "SGTClassifier":
+		# 	self.model = compose.Pipeline(
+		# 		preprocessing.StandardScaler(),
+		# 		tree.SGTClassifier())
+		# elif category == "HoeffdingTree":
+		# 	self.model = compose.Pipeline(tree.HoeffdingTree())		
 		# preprocessing.StandardScaler(),
+
 	def vectorize(self, address, no_normalize=True):
 		addr = bin(address)[2:]
 		addr = {i: int(addr[i]) for i in range(self.dim)}
@@ -384,10 +404,14 @@ class River_log():
 		return addr
 
 	def make_prediction(self, address, branch_is_taken):
-		
 		address = self.vectorize_fn(address)
 		prediction = self.model.predict_proba_one(address)
-		pred = prediction[True] > prediction[False]
+		if True in prediction and False in prediction:
+			pred = prediction[True] > prediction[False]
+		elif True in prediction:
+			pred = True
+		else:
+			pred = False
 		
 		self.model.learn_one(address, branch_is_taken)
 
