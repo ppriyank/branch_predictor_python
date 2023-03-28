@@ -19,6 +19,7 @@ plt.rcParams['font.size'] = 16
 plt.figure(figsize=(10, 10))
 
 from MicroCluster import DenStream, DenStream2, DenStream3
+
 random.seed(1)
 
 
@@ -163,13 +164,10 @@ class DenStream_Algo2():
 		print(f"Number of p_micro_clusters is {len(self.centers)}")
 		print("====")	
 
-class Nearest_Neighbour():
+class SOS_Cluster():
 	def __init__(self, past=None, dim=22, k=5):
-		self.default_pred = True
-		self.centers = [float(self.default_pred) for i in range(past)] 
-		self.distances = np.array([[0 for i in range(dim)] for j in range(past)])
-		self.past = past
-		self.k = k 
+		from SOStream.sostream import SOStream
+		sostream_clustering = SOStream(alpha = 0, min_pts = 3, merge_threshold = 50000)
 
 	def make_prediction(self, address, branch_is_taken):
 		
@@ -309,6 +307,38 @@ class Plot2(Plot):
 		plt.title(f"PCA Plot")
 		plt.savefig("fig1.png")
 		plt.clf()  
+
+class Nearest_Neighbour():
+	def __init__(self, past=None, dim=22, k=5):
+		self.default_pred = True
+		self.centers = [float(self.default_pred) for i in range(past)] 
+		self.distances = np.array([[0 for i in range(dim)] for j in range(past)])
+		self.past = past
+		self.k = k 
+
+	def make_prediction(self, address, branch_is_taken):
+		
+		prediction = self.default_pred
+		address = vectorize(address)
+		
+		dist = ((address - self.distances) ** 2).sum(-1)
+		ordered = np.argsort(dist)
+		# sorted_neigh = sorted(dist, key=lambda x: x[1])[:n_neighbors]
+
+		self.distances = self.distances[1:]
+		self.centers.pop(0)
+
+		self.distances = np.append(self.distances, address, axis=0)
+		self.centers.append(branch_is_taken * 1.0)
+		
+		
+		return prediction == branch_is_taken
+	
+	def finish(self, num_predictions):
+		print("====")
+		print(f"Buffer:  {self.centers}")
+		print("====")	
+
 
 
 def load_instructions(filename: str) -> List[Tuple[int, bool]]:
