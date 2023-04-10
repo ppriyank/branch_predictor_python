@@ -9,7 +9,10 @@ num_predictions, num_mispredictions = run_predictor(predictor, trace_file)
 
 misprediction_rate = 100 * num_mispredictions / num_predictions
 
-print(f"number of predictions:		{num_predictions}")
-print(f"number of mispredictions:	{num_mispredictions}")
-print(f"misprediction rate:		{misprediction_rate:.2f}%")
-print(f"FINAL COUNTER CONTENT:		{predictor.get_counter()}")
+print("COMMAND")
+print(f"./sim smith {counter_bits} {trace_file}")
+print("OUTPUT")
+print(f"number of predictions:\t\t{num_predictions}")
+print(f"number of mispredictions:\t{num_mispredictions}")
+print(f"misprediction rate:\t\t{misprediction_rate:.2f}%")
+print(f"FINAL COUNTER CONTENT:\t\t{predictor.get_counter()}", end='')
