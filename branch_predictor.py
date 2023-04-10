@@ -2,7 +2,7 @@ import math
 import os
 from random import randint
 from itertools import cycle
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 from abc import abstractmethod
 import numpy as np
 
@@ -405,13 +405,14 @@ def load_instructions(filename: str) -> List[Tuple[int, bool]]:
     return instructions
         
 
-def run_predictor(predictor: BranchPredictor, filename: str, return_detailed_output: bool = False) -> Tuple[int, int]:
+def run_predictor(predictor: BranchPredictor, filename: str, return_detailed_output: bool = False, instructions: Optional[List[Tuple[int, bool]]] = None) -> Tuple[int, int]:
     """
     Given an instance of a predictor and the filename of a trace file,
     runs all the branch instructions from the trace file through the predictor
     and returns the total number of predictions and the number of incorrect predictions.
     """
-    instructions = load_instructions(filename)
+    if instructions is None:
+        instructions = load_instructions(filename)
     num_predictions = len(instructions)
     num_mispredictions = 0
 
