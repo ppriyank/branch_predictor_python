@@ -478,7 +478,7 @@ class PShare:
             if p < 2**self.m2 - 1:
                 self.prediction_table[index][global_history] += 1
         else:
-         if p > 0:
-            self.prediction_table[index][global_history] -= 1
+            if p > 0:
+                self.prediction_table[index][global_history] -= 1
         self.global_history = ((self.global_history << 1) + branch_is_taken) & ((1 << self.m1) - 1)
         return p >= 2**(self.m2 - 1)
