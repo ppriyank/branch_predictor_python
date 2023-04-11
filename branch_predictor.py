@@ -441,8 +441,8 @@ def run_predictor(predictor: BranchPredictor, filename: str, return_detailed_out
 
 class PShare:
     def __init__(self, m, n):
-        self.m1 = m
-        self.m2 = n
+        self.m = m
+        self.n = n
         self.global_history = 0
         self.local_history_table = [0] * (2**n)
         self.prediction_table = [[0] * (2**m) for _ in range(2**n)]
