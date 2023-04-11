@@ -385,6 +385,174 @@ class Tage:
         return False
 
 
+class GShare_ML(BranchPredictor):
+    def __init__(self, m: int, n: int, method="running_mean") -> None:
+        self.branch_history = 0
+        self.n = n
+        self.nth_bit_from_the_right = 1 << (n-1)
+        total_entries = 2 ** m
+        if method == "running_mean":
+            super().__init__(m, counter_bits=3)
+            self.count = np.zeros(2 ** m)
+            self.running_mean_vals = np.full(2 ** m, self.threshold)
+            self.make_model_prediction = self.running_mean
+        elif method == "running_mean2":
+            super().__init__(m, counter_bits=3)
+            self.alpha = 0.75
+            self.running_mean_vals = np.full(2 ** m, self.threshold)
+            self.make_model_prediction = self.running_mean2
+        elif method == "skmeans":
+            super().__init__(m, counter_bits=3)
+            import random
+            self.alpha = 0.75
+            dim = 22
+            n_cluster = 2
+            self.prediction_table = np.array([[  [random.choice([0,1]) for i in range(dim)] for e in range (n_cluster) ] for x in range(total_entries)])
+            self.labels = [[{False: 0, True: 0} for i in range(n_cluster)] for i in range(total_entries)]
+            self.make_model_prediction = self.skmeans
+        elif method == "nearest_pattern" or method == "nearest_pattern2":
+            super().__init__(m, counter_bits=3)
+            self.make_model_prediction = self.nearest_pattern
+            k = 4
+            self.k = k 
+            self.sol = [{} for i in range(total_entries)]
+            self.centers = [['1', '1'] for i in range(total_entries)]
+            self.bucket = [] 
+            for pairs in range(2, self.k+1):
+                for k in range(pairs+1):
+                    poss = ["1" for i in range(k)] + ["0" for i in range(pairs - k)]
+                    print(poss)
+                    self.heapPermutation(poss , pairs)
+            
+            if method == "nearest_pattern2":
+                del self.centers
+                self.make_model_prediction = self.nearest_pattern2
+            # for e in self.sol[0]:
+            #     if len(e) < self.k:
+            #         self.centers.append(e)
+
+    def heapPermutation(self, a, size):
+        if size == 1:
+            for i in range(len(self.sol)):
+                self.sol[i]["".join(a)] = 0
+            return a
+        for i in range(size):
+            self.heapPermutation(a, size-1)
+            if size & 1:
+                a[0], a[size-1] = a[size-1], a[0]
+            else:
+                a[i], a[size-1] = a[size-1], a[i]
+	
+    def get_prediction_index(self, address: int) -> int:
+        return ((address >> 2) & self.rightmost_m_bits) ^ self.branch_history
+
+    def update_history(self, branch_is_taken: bool) -> None:
+        self.branch_history >>= 1
+        if branch_is_taken:
+            self.branch_history |= self.nth_bit_from_the_right
+
+    def running_mean(self, prediction_index, branch_is_taken, address=None):
+        
+        counter = self.prediction_table[prediction_index]
+        count = self.count[prediction_index]
+        
+        running_mean_val = self.running_mean_vals[prediction_index]
+        prediction = running_mean_val >= self.threshold
+        running_mean_val = (counter + count * running_mean_val) / (count + 1)
+
+        if branch_is_taken and counter < self.counter_max:
+            counter += 1
+        elif not branch_is_taken and counter > 0:
+            counter -= 1
+            
+        self.prediction_table[prediction_index] = counter
+        self.count[prediction_index] += 1
+        self.running_mean_vals[prediction_index] = running_mean_val
+        return prediction == branch_is_taken
+    
+    def running_mean2(self, prediction_index, branch_is_taken, address=None):
+        
+        counter = self.prediction_table[prediction_index]
+        running_mean_val = self.running_mean_vals[prediction_index]
+        prediction = running_mean_val >= self.threshold
+        running_mean_val = counter * self.alpha + (1-self.alpha) * running_mean_val
+
+        if branch_is_taken and counter < self.counter_max:
+            counter += 1
+        elif not branch_is_taken and counter > 0:
+            counter -= 1
+            
+        self.prediction_table[prediction_index] = counter
+        self.running_mean_vals[prediction_index] = running_mean_val
+
+        return prediction == branch_is_taken
+
+    def skmeans(self, prediction_index, branch_is_taken, address=None):
+        centers = self.prediction_table[prediction_index]
+        addr = bin(address)[2:]
+        addr = np.array([int(e) for e in addr])
+        distances = np.linalg.norm(address - centers, ord=2, axis=1.)
+        assigned_cluster = np.argmin(distances)
+        
+        stats = self.labels[prediction_index][assigned_cluster]
+        print(stats)
+        prediction = stats[True] >= stats[False] 
+
+        temp_center = centers[assigned_cluster]
+        temp_center = temp_center + self.alpha * (address - temp_center)
+        
+        self.prediction_table[prediction_index][assigned_cluster] = temp_center
+        self.labels[prediction_index][assigned_cluster][branch_is_taken] += 1
+        
+        return prediction == branch_is_taken
+    
+    def nearest_pattern(self, prediction_index, branch_is_taken, address=None):
+        prediction = 0 
+        current_dict = self.sol[prediction_index]
+        centers = self.centers[prediction_index]
+        
+        for e in range(self.k-1):
+            key = "".join(centers[-1-e: ])
+            pred = current_dict[key + '1']  >= current_dict[key + '0'] 
+            prediction += int(pred)
+            self.sol[prediction_index][ key + str(  int(branch_is_taken)  ) ] += 1
+
+        prediction = prediction / (self.k-1) > 0.5
+        centers.pop(0)		
+        centers.append( str(  int(branch_is_taken)  ) )
+        self.centers[prediction_index] = centers
+    
+        return prediction == branch_is_taken
+    
+    def nearest_pattern2(self, prediction_index, branch_is_taken, address=None):
+        prediction = 0 
+        current_dict = self.sol[prediction_index]
+        prediction = True
+        centers = bin(self.branch_history)[2:]
+        centers = '0' * (self.n - len(centers)) + centers
+
+        for e in range(1,self.k):
+            key = centers[:e]
+            pred = current_dict[key + '1']  >= current_dict[key + '0'] 
+            prediction += int(pred)
+            self.sol[prediction_index][ key + str(  int(branch_is_taken)  ) ] += 1
+        
+        prediction = prediction / (self.k-1) > 0.5
+        return prediction == branch_is_taken
+    
+    
+    
+
+    def make_prediction(self, address: int, branch_is_taken: bool) -> bool:
+        prediction_index = self.get_prediction_index(address)
+        prediction_is_correct = self.make_model_prediction(prediction_index, branch_is_taken, address)
+
+        self.update_history(branch_is_taken)
+        return prediction_is_correct
+
+
+
+
 def load_instructions(filename: str) -> List[Tuple[int, bool]]:
     """
     Loads the branch instructions from the trace file.
