@@ -1,13 +1,11 @@
 import sys
 from branch_predictor import PShare, run_predictor
 
-m1 = int(sys.argv[1])
-m2 = int(sys.argv[2])
-n = int(sys.argv[3])
-k = int(sys.argv[4])
-trace_file = sys.argv[5]
+m = int(sys.argv[1])
+n = int(sys.argv[2])
+trace_file = sys.argv[3]
 
-predictor = PShare(m1, m2, n, k)
+predictor = PShare(m, n)
 num_predictions, num_mispredictions = run_predictor(predictor, trace_file)
 
 misprediction_rate = 100 * num_mispredictions / num_predictions
