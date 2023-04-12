@@ -1,24 +1,25 @@
 from time import perf_counter
 import os
-from branch_predictor import Smith, Bimodal, GShare, Hybrid, YehPatt, Tage, run_predictor
+from typing import List, Tuple
+from branch_predictor import Smith, Bimodal, GShare, Hybrid, YehPatt, Tage, run_predictor, load_instructions
 from tqdm import tqdm
 
-trace_files = 'gcc_trace.txt', 'jpeg_trace.txt', 'perl_trace.txt'
-num_trace_files = len(trace_files)
-output_file = 'benchmarks.csv'
+TRACE_FILES = 'gcc_trace.txt', 'jpeg_trace.txt', 'perl_trace.txt'
+INSTRUCTIONS = [load_instructions(file) for file in TRACE_FILES]
+OUTPUT_FILE = 'benchmarks.csv'
 
-headers = ['Tracefile', 'Predictor', 'Predictor Arguments', 'Misprediction Rate', 'Accuracy', 'Precision', 'Recall', 'F1', 'Runtime']
-if not os.path.isfile(output_file):
+headers = ['Tracefile', 'Predictor', 'Predictor Arguments', 'Misprediction Rate', 'Accuracy', 'Precision', 'Recall', 'F1', 'Runtime', 'TP', 'TN', 'FP', 'FN']
+if not os.path.isfile(OUTPUT_FILE):
     header_line = ','.join(headers)
-    with open(output_file, 'w') as f:
+    with open(OUTPUT_FILE, 'w') as f:
         f.write(header_line)
         f.write('\n')
 
 
-def run_benchmark(tracefile: str, predictor_class, predictor_name: str, predictor_args: tuple, outputfile: str):
+def run_benchmark_one_trace_file(trace_file: str, instructions: List[Tuple[int, bool]], predictor_class, predictor_args: tuple):
     predictor = predictor_class(*predictor_args)
     start = perf_counter()
-    num_predictions, num_mispredictions, detailed_output = run_predictor(predictor, tracefile, True)
+    num_predictions, num_mispredictions, detailed_output = run_predictor(predictor, trace_file, True, instructions)
     runtime = perf_counter() - start
 
     true_positive = detailed_output[(True, True)]
@@ -34,44 +35,57 @@ def run_benchmark(tracefile: str, predictor_class, predictor_name: str, predicto
 
     args_string = ', '.join(str(arg) for arg in predictor_args)
     args_string = f'"{args_string}"'
-    data = [tracefile, predictor_name, args_string, f"{misprediction_rate:.2f}", f"{accuracy:.4f}", f"{precision:.4f}", f"{recall:.4f}", f"{f1:.4f}", f"{runtime:.1f}"]
+    data = [trace_file, predictor_class.__name__, args_string, f"{misprediction_rate:.2f}", f"{accuracy:.4f}", f"{precision:.4f}", f"{recall:.4f}", f"{f1:.4f}", f"{runtime:.1f}",
+            true_positive, true_negative, false_positive, false_negative]
     data_line = ','.join(data)
 
-    with open(outputfile, 'a') as f:
+    with open(OUTPUT_FILE, 'a') as f:
         f.write(data_line)
         f.write('\n')
 
 
-for i, trace_file in enumerate(trace_files):
-    current_trace_file = i + 1
+def run_benchmark(predictor_class, predictor_args: tuple):
+    for instructions, trace_file in zip(INSTRUCTIONS, TRACE_FILES):
+        run_benchmark_one_trace_file(trace_file, instructions, predictor_class, predictor_args)
 
+
+if __name__ == "__main__":
     ### Smith ###
-    for counter_bits in tqdm(range(1, 6), desc=f'Smith {current_trace_file} of {num_trace_files}'):
-        run_benchmark(trace_file, Smith, "Smith", (counter_bits,), output_file)
+    for counter_bits in tqdm(range(1, 21), desc="Smith"):
+        run_benchmark(Smith, (counter_bits,))
 
     ### Bimodal ###
-    for m in tqdm(range(2, 17, 2), desc=f'Bimodal {current_trace_file} of {num_trace_files}'):
-        run_benchmark(trace_file, Bimodal, "Bimodal", (m,), output_file)
-
-    ### GShare ###
-    for m in tqdm(range(2, 17, 2), desc=f'GShare {current_trace_file} of {num_trace_files}'):
-        for n in range(2, m + 1, 2):
-            run_benchmark(trace_file, GShare, "GShare", (m, n), output_file)
-
-    ### Hybrid ###
-    for k in tqdm(range(2, 11, 4), desc=f'Hybrid {current_trace_file} of {num_trace_files}'):
-        for m_gshare in range(2, 17, 4):
-            for n in range(2, m_gshare + 1, 4):
-                for m_bimodal in range(2, 17, 4):
-                    run_benchmark(trace_file, Hybrid, "Hybrid", (k, m_gshare, n, m_bimodal), output_file)
-
-    ### YehPatt ###
-    for m in tqdm(range(2, 17, 2), desc=f'YehPatt {current_trace_file} of {num_trace_files}'):
-        for n in range(2, 11, 2):
-            run_benchmark(trace_file, YehPatt, "YehPatt", (m, n), output_file)
+    for m in tqdm(range(1, 21), desc="Bimodal"):
+        run_benchmark(Bimodal, (m,))
 
     ### TAGE ###
-    for m in tqdm(range(2, 17, 2), desc=f'TAGE {current_trace_file} of {num_trace_files}'):
-        run_benchmark(trace_file, Tage, "TAGE", (m,), output_file)
+    for m in tqdm(range(2, 21), desc=f"TAGE"):
+        run_benchmark(Tage, (m,))
+
+    ### GShare ###
+    gshare_args = []
+    for m in range(2, 21, 2):
+        for n in range(2, m + 1, 2):
+            gshare_args.append((m, n))
+    for args in tqdm(gshare_args, desc="GShare"):
+        run_benchmark(GShare, args)
+
+    ### YehPatt ###
+    yehpatt_args = []
+    for m in range(2, 21, 2):
+        for n in range(2, 21, 2):
+            yehpatt_args.append((m, n))
+    for args in tqdm(yehpatt_args, desc="YehPatt"):
+        run_benchmark(YehPatt, args)
+
+    ### Hybrid (takes a *very* long time) ###
+    hybrid_args = []
+    for k in range(11):
+        for m_gshare in range(2, 21, 4):
+            for n in range(2, m_gshare + 1, 4):
+                for m_bimodal in range(2, 21, 4):
+                    hybrid_args.append((k, m_gshare, n, m_bimodal))
+    for args in tqdm(hybrid_args, desc="Hybrid"):
+        run_benchmark(Hybrid, args)
 
 
