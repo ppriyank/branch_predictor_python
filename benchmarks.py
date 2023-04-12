@@ -103,6 +103,37 @@ for i, trace_file in enumerate(trace_files):
     for m in tqdm(range(2, 17, 2), desc=f'GShare_ML- {current_trace_file} of {num_trace_files}'):
         for n in range(2, m + 1, 2):
             run_benchmark(trace_file, GShare_ML, "GShare_ML", (m, n, "logistic2"), output_file)
+    
+    ### GShare: Perceptron ###
+    for m in tqdm(range(2, 17, 2), desc=f'GShare_ML- {current_trace_file} of {num_trace_files}'):
+        for n in range(2, m + 1, 2):
+            run_benchmark(trace_file, GShare_ML, "GShare_ML", (m, n, "Perceptron"), output_file)
 
+    ### GShare: Perceptron 2 ###
+    for m in tqdm(range(2, 17, 2), desc=f'GShare_ML- {current_trace_file} of {num_trace_files}'):
+        for n in range(2, m + 1, 2):
+            run_benchmark(trace_file, GShare_ML, "GShare_ML", (m, n, "Perceptron2"), output_file)
+    
+    ### GShare: ALMA ###
+    for m in tqdm(range(2, 17, 2), desc=f'GShare_ML- {current_trace_file} of {num_trace_files}'):
+        for n in range(2, m + 1, 2):
+            run_benchmark(trace_file, GShare_ML, "GShare_ML", (m, n, "ALMA"), output_file)
+    
+    ### GShare: ALMA ###
+    for m in tqdm(range(2, 17, 2), desc=f'GShare_ML- {current_trace_file} of {num_trace_files}'):
+        for n in range(2, m + 1, 2):
+            run_benchmark(trace_file, GShare_ML, "GShare_ML", (m, n, "ALMA2"), output_file)
+
+    ### GShare: GaussianNB ###
+    for m in tqdm(range(2, 17, 2), desc=f'GShare_ML- {current_trace_file} of {num_trace_files}'):
+        for n in range(2, m + 1, 2):
+            run_benchmark(trace_file, GShare_ML, "GShare_ML", (m, n, "GaussianNB"), output_file)
+
+    ### GShare: GaussianNB ###
+    for m in tqdm(range(2, 17, 2), desc=f'GShare_ML- {current_trace_file} of {num_trace_files}'):
+        for n in range(2, m + 1, 2):
+            run_benchmark(trace_file, GShare_ML, "GShare_ML", (m, n, "GaussianNB2"), output_file)
+
+                
     
 # python benchmarks.py
