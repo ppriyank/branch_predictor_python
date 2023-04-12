@@ -385,6 +385,354 @@ class Tage:
         return False
 
 
+class GShare_ML(BranchPredictor):
+    def __init__(self, m: int, n: int, method="running_mean") -> None:
+        # conda create --name bert python=3.8  
+        # pip install pep517 jsonpatch
+        # pip install river
+
+        from river import (
+            compose, linear_model, metrics, preprocessing, forest, 
+            ensemble, model_selection, tree, naive_bayes, neighbors, utils)
+        self.normalization = True
+        self.branch_history = 0
+        self.n = n
+        self.nth_bit_from_the_right = 1 << (n-1)
+        total_entries = 2 ** m
+        # import pdb
+        # pdb.set_trace()
+        # self.__dict__
+        if method == "running_mean":
+            super().__init__(m, counter_bits=3)
+            print("Running Mean!!")
+            self.count = np.zeros(total_entries)
+            self.running_mean_vals = np.full(total_entries, self.threshold)
+            self.make_model_prediction = self.running_mean
+        elif method == "running_mean2":
+            super().__init__(m, counter_bits=3)
+            print("Running Mean 2 !!")
+            self.alpha = 0.75
+            self.running_mean_vals = np.full(2 ** m, self.threshold)
+            self.make_model_prediction = self.running_mean2
+        elif method == "skmeans":
+            super().__init__(m, counter_bits=3)
+            import random
+            self.alpha = 0.75
+            dim = 22
+            n_cluster = 2
+            # self.prediction_table = np.array([[  [random.choice([0,1]) for i in range(dim)] for e in range (n_cluster) ] for x in range(total_entries)])
+            # self.labels = [[{False: 0, True: 0} for i in range(n_cluster)] for i in range(total_entries)]
+            self.prediction_table = np.array([  [random.choice([0,1]) for i in range(dim)] for e in range (total_entries) ])
+            self.labels = [{False: 0, True: 0} for i in range(total_entries)]
+            self.make_model_prediction = self.skmeans2            
+        elif method == "nearest_pattern" or method == "nearest_pattern2":
+            super().__init__(m, counter_bits=1)
+            print("...Nearest Pattern....")
+            del self.counter_max, self.threshold, self.prediction_table
+            self.make_model_prediction = self.nearest_pattern
+            self.k = 3
+            self.sol = [{} for i in range(total_entries)]
+            self.centers = [['1' for j in range(self.k)] for i in range(total_entries)]
+            
+            for pairs in range(2, self.k+1):
+                for k in range(pairs+1):
+                    poss = ["1" for i in range(k)] + ["0" for i in range(pairs - k)]
+                    self.heapPermutation(poss , pairs)
+            
+            if method == "nearest_pattern2":
+                del self.centers
+                self.make_model_prediction = self.nearest_pattern2
+
+        elif method == "logistic":
+            super().__init__(m, counter_bits=3)
+            self.prediction_table = [compose.Pipeline(linear_model.LogisticRegression()) for i in range(total_entries)]
+            self.make_model_prediction = self.river_prediction            
+        elif method == "logistic2":
+            super().__init__(m, counter_bits=3)
+            self.prediction_table = compose.Pipeline(linear_model.LogisticRegression())
+            self.make_model_prediction = self.river_prediction2            
+        elif method == "Perceptron":
+            super().__init__(m, counter_bits=3)
+            self.prediction_table = [compose.Pipeline(linear_model.Perceptron()) for i in range(total_entries)]
+            self.make_model_prediction = self.river_prediction            
+        elif method == "Perceptron2":
+            super().__init__(m, counter_bits=3)
+            self.prediction_table = compose.Pipeline(linear_model.Perceptron())
+            self.make_model_prediction = self.river_prediction2            
+        elif method == "ALMA":
+            super().__init__(m, counter_bits=3)
+            self.prediction_table = [compose.Pipeline(linear_model.ALMAClassifier()) for i in range(total_entries)]
+            self.make_model_prediction = self.river_prediction            
+        elif method == "ALMA2":
+            super().__init__(m, counter_bits=3)
+            self.prediction_table = compose.Pipeline(compose.Pipeline(linear_model.ALMAClassifier()))
+            self.make_model_prediction = self.river_prediction2            
+        elif method == "HoeffdingAdaptiveTreeClassifier":
+            super().__init__(m, counter_bits=3)
+            self.prediction_table = [compose.Pipeline(tree.HoeffdingAdaptiveTreeClassifier()) for i in range(total_entries)]
+            self.make_model_prediction = self.river_prediction3            
+        elif method == "HoeffdingAdaptiveTreeClassifier2":
+            super().__init__(m, counter_bits=3)
+            self.prediction_table = compose.Pipeline(tree.HoeffdingAdaptiveTreeClassifier())
+            self.make_model_prediction = self.river_prediction4            
+        elif method == "GaussianNB":
+            super().__init__(m, counter_bits=3)
+            self.normalization = False
+            self.prediction_table = [compose.Pipeline(naive_bayes.GaussianNB()) for i in range(total_entries)]
+            self.make_model_prediction = self.river_prediction3            
+        elif method == "GaussianNB2":
+            super().__init__(m, counter_bits=3)
+            self.normalization = False
+            self.prediction_table = compose.Pipeline(naive_bayes.GaussianNB())
+            self.make_model_prediction = self.river_prediction4            
+        
+    def heapPermutation(self, a, size):
+        if size == 1:
+            for i in range(len(self.sol)):
+                self.sol[i]["".join(a)] = 0
+            return a
+        for i in range(size):
+            self.heapPermutation(a, size-1)
+            if size & 1:
+                a[0], a[size-1] = a[size-1], a[0]
+            else:
+                a[i], a[size-1] = a[size-1], a[i]
+    
+    def get_prediction_index(self, address: int) -> int:
+        return ((address >> 2) & self.rightmost_m_bits) ^ self.branch_history
+
+    def update_history(self, branch_is_taken: bool) -> None:
+        self.branch_history >>= 1
+        if branch_is_taken:
+            self.branch_history |= self.nth_bit_from_the_right
+
+    def running_mean(self, prediction_index, branch_is_taken, address=None):
+        
+        counter = self.prediction_table[prediction_index]
+        count = self.count[prediction_index]
+        
+        running_mean_val = self.running_mean_vals[prediction_index]
+        prediction = running_mean_val >= self.threshold
+        running_mean_val = (counter + count * running_mean_val) / (count + 1)
+
+        if branch_is_taken and counter < self.counter_max:
+            counter += 1
+        elif not branch_is_taken and counter > 0:
+            counter -= 1
+            
+        self.prediction_table[prediction_index] = counter
+        self.count[prediction_index] += 1
+        self.running_mean_vals[prediction_index] = running_mean_val
+        return prediction == branch_is_taken
+    
+    def running_mean2(self, prediction_index, branch_is_taken, address=None):
+        
+        counter = self.prediction_table[prediction_index]
+        running_mean_val = self.running_mean_vals[prediction_index]
+        prediction = running_mean_val >= self.threshold
+        running_mean_val = counter * self.alpha + (1-self.alpha) * running_mean_val
+
+        if branch_is_taken and counter < self.counter_max:
+            counter += 1
+        elif not branch_is_taken and counter > 0:
+            counter -= 1
+            
+        self.prediction_table[prediction_index] = counter
+        self.running_mean_vals[prediction_index] = running_mean_val
+
+        return prediction == branch_is_taken
+
+    def skmeans(self, prediction_index, branch_is_taken, address=None):
+        centers = self.prediction_table[prediction_index]
+        addr = bin(address)[2:]
+        addr = np.array([int(e) for e in addr])
+        distances = np.linalg.norm(address - centers, ord=2, axis=1.)
+        assigned_cluster = np.argmin(distances)
+        
+        stats = self.labels[prediction_index][assigned_cluster]
+        print(stats)
+        prediction = stats[True] >= stats[False] 
+
+        temp_center = centers[assigned_cluster]
+        temp_center = temp_center + self.alpha * (address - temp_center)
+        
+        self.prediction_table[prediction_index][assigned_cluster] = temp_center
+        self.labels[prediction_index][assigned_cluster][branch_is_taken] += 1
+        
+        return prediction == branch_is_taken
+    
+    def skmeans2(self, prediction_index, branch_is_taken, address=None):
+        addr = bin(address)[2:]
+        addr = np.array([int(e) for e in addr])
+        distances = np.linalg.norm(addr - self.prediction_table, ord=1, axis=1.)
+        assigned_cluster = np.argmin(distances)
+        
+        stats = self.labels[assigned_cluster]
+        prediction = stats[True] >= stats[False] 
+
+        temp_center = self.prediction_table[assigned_cluster]
+        temp_center = temp_center + self.alpha * (address - temp_center)
+        
+        self.prediction_table[assigned_cluster] = temp_center
+        self.labels[assigned_cluster][branch_is_taken] += 1
+        
+        return prediction == branch_is_taken
+    
+    def nearest_pattern(self, prediction_index, branch_is_taken, address=None):
+        prediction = 0 
+        current_dict = self.sol[prediction_index]
+        centers = self.centers[prediction_index]
+
+        for e in range(self.k-1):
+            key = "".join(centers[-1-e: ])
+            pred = current_dict[key + '1']  >= current_dict[key + '0'] 
+            prediction += int(pred)
+            self.sol[prediction_index][ key + str(  int(branch_is_taken)  ) ] += 1
+        prediction = prediction / (self.k-1) > 0.5
+        centers.pop(0)      
+        centers.append( str(  int(branch_is_taken)  ) )
+        self.centers[prediction_index] = centers
+    
+        return prediction == branch_is_taken
+    
+    def nearest_pattern2(self, prediction_index, branch_is_taken, address=None):    
+        prediction = 0 
+        current_dict = self.sol[prediction_index]
+        prediction = True
+        centers = bin(self.branch_history)[2:]
+        centers = '0' * (self.n - len(centers)) + centers
+
+        for e in range(1,self.k):
+            key = centers[:e]
+            pred = current_dict[key + '1']  >= current_dict[key + '0'] 
+            prediction += int(pred)
+            self.sol[prediction_index][ key + str(  int(branch_is_taken)  ) ] += 1
+        
+        prediction = prediction / (self.k-1) > 0.5
+        return prediction == branch_is_taken
+    
+    def river_prediction(self, prediction_index, branch_is_taken, address=None):
+        
+        model = self.prediction_table[prediction_index]
+        record = bin(self.branch_history)[2:]
+        record = '0' * (self.n - len(record)) + record
+        record = [int(x) for x in record]
+        
+        if self.normalization:
+            denom = sum(record) ** 0.5 + 1e-6
+            record = {i: x / denom for i,x in enumerate(record)}
+        else:
+            record = {i: x for i,x in enumerate(record)}
+
+        prediction = model.predict_proba_one(record)
+        prediction = prediction[True] > prediction[False]
+        model.learn_one(record, branch_is_taken)
+
+        self.prediction_table[prediction_index] = model 
+
+        return prediction == branch_is_taken
+    
+    def river_prediction2(self, prediction_index, branch_is_taken, address=None):
+        
+        model = self.prediction_table
+        record = bin(self.branch_history)[2:]
+        record = '0' * (self.n - len(record)) + record
+        record = [int(x) for x in record]
+
+        # record = {i: x for i,x in enumerate(record)}
+        
+        denom = sum(record) ** 0.5 + 1e-6
+        record = {i: x / denom for i,x in enumerate(record)}
+        
+        # return addr
+        prediction = model.predict_proba_one(record)
+        prediction = prediction[True] > prediction[False]
+        model.learn_one(record, branch_is_taken)
+
+        self.prediction_table = model 
+
+        return prediction == branch_is_taken
+    
+    def river_prediction3(self, prediction_index, branch_is_taken, address=None):
+        prediction = True
+        model = self.prediction_table[prediction_index]
+        record = bin(self.branch_history)[2:]
+        record = '0' * (self.n - len(record)) + record
+        record = [int(x) for x in record] 
+        if self.normalization:
+            denom = sum(record) ** 0.5 + 1e-6
+            record = {i: x / denom for i,x in enumerate(record)}
+        else:
+            record = {i: x for i,x in enumerate(record)}
+
+        prediction = model.predict_proba_one(record)
+        if True in prediction and False in prediction:
+            prediction = prediction[True] > prediction[False]
+        elif False in prediction:
+            prediction = False
+        
+        # print(record, branch_is_taken)
+        model.learn_one(record, branch_is_taken)
+        self.prediction_table[prediction_index] = model 
+        return prediction == branch_is_taken
+    
+    def river_prediction4(self, prediction_index, branch_is_taken, address=None):
+        prediction = True
+        model = self.prediction_table
+        record = bin(self.branch_history)[2:]
+        record = '0' * (self.n - len(record)) + record
+        record = [int(x) for x in record]
+        
+        if self.normalization:
+            denom = sum(record) ** 0.5 + 1e-6
+            record = {i: x / denom for i,x in enumerate(record)}
+        else:
+            record = {i: x for i,x in enumerate(record)}
+
+        prediction = model.predict_proba_one(record)
+        if True in prediction and False in prediction:
+            prediction = prediction[True] > prediction[False]
+        elif False in prediction:
+            prediction = False
+        
+        model.learn_one(record, branch_is_taken)
+        self.prediction_table = model 
+
+        return prediction == branch_is_taken
+    
+    def river_prediction5(self, prediction_index, branch_is_taken, address=None):
+        prediction = True
+        model = self.prediction_table
+        record = bin(address)[2:]
+        record = [int(x) for x in record]
+        if self.normalization:
+            denom = sum(record) ** 0.5 + 1e-6
+            record = {i: x / denom for i,x in enumerate(record)}
+        else:
+            record = {i: x for i,x in enumerate(record)}
+
+        prediction = model.predict_proba_one(record)
+        if True in prediction and False in prediction:
+            prediction = prediction[True] > prediction[False]
+        elif False in prediction:
+            prediction = False
+        
+        model.learn_one(record, branch_is_taken)
+        self.prediction_table = model 
+
+        return prediction == branch_is_taken
+    
+    
+    def make_prediction(self, address: int, branch_is_taken: bool) -> bool:
+        prediction_index = self.get_prediction_index(address)
+        prediction_is_correct = self.make_model_prediction(prediction_index, branch_is_taken, address)
+
+        self.update_history(branch_is_taken)
+        return prediction_is_correct
+
+
+
+
 def load_instructions(filename: str) -> List[Tuple[int, bool]]:
     """
     Loads the branch instructions from the trace file.
@@ -440,46 +788,43 @@ def run_predictor(predictor: BranchPredictor, filename: str, return_detailed_out
     return num_predictions, num_mispredictions
 
 
-
 class PShare:
-    def __init__(self, m1, m2, n, k):
-        self.m1 = m1
-        self.m2 = m2
+    def __init__(self, m, n):
+        self.m = m
         self.n = n
-        self.k = k
         self.global_history = 0
-        self.local_history_table = [0] * (2**self.k)
-        self.prediction_table = [[0] * (2**self.n) for _ in range(2**self.m1)]
+        self.local_history_table = [0] * (2**n)
+        self.prediction_table = [[0] * (2**m) for _ in range(2**n)]
 
     def predict(self, address, outcome):
-        global_history_idx = self.global_history & ((1 << self.m2) - 1)
-        local_history_idx = address & ((1 << self.k) - 1)
+        global_history_idx = self.global_history & ((1 << self.n) - 1)
+        local_history_idx = address & ((1 << self.n) - 1)
         local_history = self.local_history_table[local_history_idx]
 
-        prediction_idx = (global_history_idx << self.m1) | local_history
+        prediction_idx = (global_history_idx << self.m) | local_history
         prediction = self.prediction_table[prediction_idx]
 
         if outcome == "T":
-            prediction = min(prediction + 1, (1 << self.n) - 1)
+            prediction = min(prediction + 1, (1 << self.m) - 1)
         else:
             prediction = max(prediction - 1, 0)
 
         self.prediction_table[prediction_idx] = prediction
 
-        self.global_history = ((self.global_history << 1) & ((1 << self.m2) - 1)) | (outcome == "T")
-        self.local_history_table[local_history_idx] = ((local_history << 1) & ((1 << self.n) - 1)) | (outcome == "T")
+        self.global_history = ((self.global_history << 1) & ((1 << self.n) - 1)) | (outcome == "T")
+        self.local_history_table[local_history_idx] = ((local_history << 1) & ((1 << self.m) - 1)) | (outcome == "T")
 
-        return prediction >= (1 << (self.n - 1))
+        return prediction >= (1 << (self.m - 1))
     
     def make_prediction(self, address, branch_is_taken):
-        index = address & ((1 << self.n) - 1)
+        index = address & ((1 << self.m) - 1)
         global_history = self.global_history
-        p = self.prediction_table[index][global_history]
+        p = self.prediction_table[global_history][index]
         if branch_is_taken:
-            if p < 2**self.m2 - 1:
-                self.prediction_table[index][global_history] += 1
+            if p < 2**self.n - 1:
+                self.prediction_table[global_history][index] += 1
         else:
             if p > 0:
-                self.prediction_table[index][global_history] -= 1
-        self.global_history = ((self.global_history << 1) + branch_is_taken) & ((1 << self.m1) - 1)
-        return p >= 2**(self.m2 - 1)
+                self.prediction_table[global_history][index] -= 1
+        self.global_history = ((self.global_history << 1) + branch_is_taken) & ((1 << self.n) - 1)
+        return p >= 2**(self.n - 1)
