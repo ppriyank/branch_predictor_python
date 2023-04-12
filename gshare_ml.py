@@ -43,15 +43,12 @@ for key in data_line:
 #         break
 
 
-
-# python gshare_ml.py 16 16 traces/gcc_trace.txt
-# python gshare_ml.py 16 16 traces/perl_trace.txt
 # python gshare_ml.py 16 16 "running_mean" traces/jpeg_trace.txt
 # F1             :		    0.8988
 # python gshare_ml.py 16 16 "running_mean2" traces/jpeg_trace.txt
 # F1             :		    0.9527
 # python gshare_ml.py 16 16 "nearest_pattern" traces/jpeg_trace.txt
-# F1             :		    0.9567
+# F1             :		    0.9556
 # python gshare_ml.py 16 16 "nearest_pattern2" traces/jpeg_trace.txt
 # F1             :		    0.9568
 # python gshare_ml.py 16 16 "logistic" traces/jpeg_trace.txt
@@ -72,6 +69,9 @@ for key in data_line:
 # F1             :		    0.8878
 # python gshare_ml.py 16 16 "ExtremelyFastDecisionTreeClassifier" traces/jpeg_trace.txt
 # python gshare_ml.py 16 16 "ExtremelyFastDecisionTreeClassifier2" traces/jpeg_trace.txt
+
+# python gshare_ml.py 16 16 "skmeans" traces/jpeg_trace.txt
+# F1             :		    0.8878
 
 
 
