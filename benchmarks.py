@@ -41,13 +41,11 @@ def run_benchmark_one_trace_file(trace_file: str, instructions: List[Tuple[int, 
 
     if size is None:
         size = "NA"
-    else:
-        size = str(size)
 
     args_string = ', '.join(str(arg) for arg in predictor_args)
     args_string = f'"{args_string}"'
     data = [trace_file, predictor_class.__name__, args_string, f"{misprediction_rate:.2f}", f"{accuracy:.4f}", f"{precision:.4f}", f"{recall:.4f}", f"{f1:.4f}", f"{runtime:.1f}",
-            true_positive, true_negative, false_positive, false_negative, size]
+            f"{true_positive}", f"{true_negative}", f"{false_positive}", f"{false_negative}", f"{size}"]
     data_line = ','.join(data)
 
     with open(OUTPUT_FILE, 'a') as f:
