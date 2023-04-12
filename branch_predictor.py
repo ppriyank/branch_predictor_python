@@ -387,6 +387,14 @@ class Tage:
 
 class GShare_ML(BranchPredictor):
     def __init__(self, m: int, n: int, method="running_mean") -> None:
+        # conda create --name bert python=3.8  
+        # pip install pep517 jsonpatch
+        # pip install river
+
+        from river import (
+			compose, linear_model, metrics, preprocessing, forest, 
+			ensemble, model_selection, tree, naive_bayes, neighbors, utils)
+        self.normalization = True
         self.branch_history = 0
         self.n = n
         self.nth_bit_from_the_right = 1 << (n-1)
@@ -430,7 +438,49 @@ class GShare_ML(BranchPredictor):
             # for e in self.sol[0]:
             #     if len(e) < self.k:
             #         self.centers.append(e)
-
+        elif method == "logistic":
+            super().__init__(m, counter_bits=3)
+            self.prediction_table = [compose.Pipeline(linear_model.LogisticRegression()) for i in range(total_entries)]
+            self.make_model_prediction = self.river_prediction            
+        elif method == "logistic2":
+            super().__init__(m, counter_bits=3)
+            self.prediction_table = compose.Pipeline(linear_model.LogisticRegression())
+            self.make_model_prediction = self.river_prediction2            
+        elif method == "Perceptron":
+            super().__init__(m, counter_bits=3)
+            self.prediction_table = [compose.Pipeline(linear_model.Perceptron()) for i in range(total_entries)]
+            self.make_model_prediction = self.river_prediction            
+        elif method == "Perceptron2":
+            super().__init__(m, counter_bits=3)
+            self.prediction_table = compose.Pipeline(linear_model.Perceptron())
+            self.make_model_prediction = self.river_prediction2            
+        elif method == "ALMA":
+            super().__init__(m, counter_bits=3)
+            self.prediction_table = [compose.Pipeline(linear_model.ALMAClassifier()) for i in range(total_entries)]
+            self.make_model_prediction = self.river_prediction            
+        elif method == "ALMA2":
+            super().__init__(m, counter_bits=3)
+            self.prediction_table = compose.Pipeline(compose.Pipeline(linear_model.ALMAClassifier()))
+            self.make_model_prediction = self.river_prediction2            
+        elif method == "HoeffdingAdaptiveTreeClassifier":
+            super().__init__(m, counter_bits=3)
+            self.prediction_table = [compose.Pipeline(tree.HoeffdingAdaptiveTreeClassifier()) for i in range(total_entries)]
+            self.make_model_prediction = self.river_prediction3            
+        elif method == "HoeffdingAdaptiveTreeClassifier2":
+            super().__init__(m, counter_bits=3)
+            self.prediction_table = compose.Pipeline(tree.HoeffdingAdaptiveTreeClassifier())
+            self.make_model_prediction = self.river_prediction4            
+        elif method == "GaussianNB":
+            super().__init__(m, counter_bits=3)
+            self.normalization = False
+            self.prediction_table = [compose.Pipeline(naive_bayes.GaussianNB()) for i in range(total_entries)]
+            self.make_model_prediction = self.river_prediction3            
+        elif method == "GaussianNB2":
+            super().__init__(m, counter_bits=3)
+            self.normalization = False
+            self.prediction_table = compose.Pipeline(naive_bayes.GaussianNB())
+            self.make_model_prediction = self.river_prediction4            
+        
     def heapPermutation(self, a, size):
         if size == 1:
             for i in range(len(self.sol)):
@@ -540,9 +590,118 @@ class GShare_ML(BranchPredictor):
         prediction = prediction / (self.k-1) > 0.5
         return prediction == branch_is_taken
     
-    
-    
+    def river_prediction(self, prediction_index, branch_is_taken, address=None):
+        
+        model = self.prediction_table[prediction_index]
+        record = bin(self.branch_history)[2:]
+        record = '0' * (self.n - len(record)) + record
+        record = [int(x) for x in record]
+        
+        if self.normalization:
+            denom = sum(record) ** 0.5 + 1e-6
+            record = {i: x / denom for i,x in enumerate(record)}
+        else:
+            record = {i: x for i,x in enumerate(record)}
 
+        prediction = model.predict_proba_one(record)
+        prediction = prediction[True] > prediction[False]
+        model.learn_one(record, branch_is_taken)
+
+        self.prediction_table[prediction_index] = model 
+
+        return prediction == branch_is_taken
+    
+    def river_prediction2(self, prediction_index, branch_is_taken, address=None):
+        
+        model = self.prediction_table
+        record = bin(self.branch_history)[2:]
+        record = '0' * (self.n - len(record)) + record
+        record = [int(x) for x in record]
+
+        # record = {i: x for i,x in enumerate(record)}
+        
+        denom = sum(record) ** 0.5 + 1e-6
+        record = {i: x / denom for i,x in enumerate(record)}
+        
+        # return addr
+        prediction = model.predict_proba_one(record)
+        prediction = prediction[True] > prediction[False]
+        model.learn_one(record, branch_is_taken)
+
+        self.prediction_table = model 
+
+        return prediction == branch_is_taken
+    
+    def river_prediction3(self, prediction_index, branch_is_taken, address=None):
+        prediction = True
+        model = self.prediction_table[prediction_index]
+        record = bin(self.branch_history)[2:]
+        record = '0' * (self.n - len(record)) + record
+        record = [int(x) for x in record] 
+        if self.normalization:
+            denom = sum(record) ** 0.5 + 1e-6
+            record = {i: x / denom for i,x in enumerate(record)}
+        else:
+            record = {i: x for i,x in enumerate(record)}
+
+        prediction = model.predict_proba_one(record)
+        if True in prediction and False in prediction:
+            prediction = prediction[True] > prediction[False]
+        elif False in prediction:
+            prediction = False
+        
+        # print(record, branch_is_taken)
+        model.learn_one(record, branch_is_taken)
+        self.prediction_table[prediction_index] = model 
+        return prediction == branch_is_taken
+    
+    def river_prediction4(self, prediction_index, branch_is_taken, address=None):
+        prediction = True
+        model = self.prediction_table
+        record = bin(self.branch_history)[2:]
+        record = '0' * (self.n - len(record)) + record
+        record = [int(x) for x in record]
+        
+        if self.normalization:
+            denom = sum(record) ** 0.5 + 1e-6
+            record = {i: x / denom for i,x in enumerate(record)}
+        else:
+            record = {i: x for i,x in enumerate(record)}
+
+        prediction = model.predict_proba_one(record)
+        if True in prediction and False in prediction:
+            prediction = prediction[True] > prediction[False]
+        elif False in prediction:
+            prediction = False
+        
+        model.learn_one(record, branch_is_taken)
+        self.prediction_table = model 
+
+        return prediction == branch_is_taken
+    
+    def river_prediction5(self, prediction_index, branch_is_taken, address=None):
+        prediction = True
+        model = self.prediction_table
+        record = bin(address)[2:]
+        record = [int(x) for x in record]
+        if self.normalization:
+            denom = sum(record) ** 0.5 + 1e-6
+            record = {i: x / denom for i,x in enumerate(record)}
+        else:
+            record = {i: x for i,x in enumerate(record)}
+
+        prediction = model.predict_proba_one(record)
+        if True in prediction and False in prediction:
+            prediction = prediction[True] > prediction[False]
+        elif False in prediction:
+            prediction = False
+        
+        model.learn_one(record, branch_is_taken)
+        self.prediction_table = model 
+
+        return prediction == branch_is_taken
+    
+    
     def make_prediction(self, address: int, branch_is_taken: bool) -> bool:
         prediction_index = self.get_prediction_index(address)
         prediction_is_correct = self.make_model_prediction(prediction_index, branch_is_taken, address)

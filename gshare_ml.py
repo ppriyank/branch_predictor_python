@@ -54,4 +54,26 @@ for key in data_line:
 # F1             :		    0.9567
 # python gshare_ml.py 16 16 "nearest_pattern2" traces/jpeg_trace.txt
 # F1             :		    0.9568
+# python gshare_ml.py 16 16 "logistic" traces/jpeg_trace.txt
+# F1             :		    0.9539
+# python gshare_ml.py 16 16 "logistic2" traces/jpeg_trace.txt
+# F1             :		    0.9195
+# python gshare_ml.py 16 16 "Perceptron" traces/jpeg_trace.txt
+# F1             :		    0.9470
+# python gshare_ml.py 16 16 "Perceptron2" traces/jpeg_trace.txt
+# F1             :		    0.9004
+# python gshare_ml.py 16 16 "ALMA" traces/jpeg_trace.txt
+# F1             :		    0.9499
+# python gshare_ml.py 16 16 "ALMA2" traces/jpeg_trace.txt
+# F1             :		    0.9053
+# python gshare_ml.py 16 16 "GaussianNB" traces/jpeg_trace.txt
+# F1             :		    0.7341
+# python gshare_ml.py 16 16 "GaussianNB2" traces/jpeg_trace.txt
+# F1             :		    0.8878
+# python gshare_ml.py 16 16 "ExtremelyFastDecisionTreeClassifier" traces/jpeg_trace.txt
+# python gshare_ml.py 16 16 "ExtremelyFastDecisionTreeClassifier2" traces/jpeg_trace.txt
+
+
+
+
 
