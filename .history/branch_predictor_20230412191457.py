@@ -414,14 +414,14 @@ class Tage:
         return total_component_size + global_history_bits + self.bimodal.size
 
 class PShare:
-    def __init__(self, m, n) -> None:
+    def __init__(self, m, n):
         self.m = m
         self.n = n
         self.global_history = 0
         self.local_history_table = [0] * (2**n)
         self.prediction_table = [[0] * (2**m) for _ in range(2**n)]
 
-    def predict(self, address, outcome) -> bool:
+    def predict(self, address, outcome):
         global_history_idx = self.global_history & ((1 << self.n) - 1)
         local_history_idx = address & ((1 << self.n) - 1)
         local_history = self.local_history_table[local_history_idx]
@@ -440,6 +440,19 @@ class PShare:
         self.local_history_table[local_history_idx] = ((local_history << 1) & ((1 << self.m) - 1)) | (outcome == "T")
 
         return prediction >= (1 << (self.m - 1))
+    
+    def make_prediction(self, address, branch_is_taken):
+        index = address & ((1 << self.m) - 1)
+        global_history = self.global_history
+        p = self.prediction_table[global_history][index]
+        if branch_is_taken:
+            if p < 2**self.n - 1:
+                self.prediction_table[global_history][index] += 1
+        else:
+            if p > 0:
+                self.prediction_table[global_history][index] -= 1
+        self.global_history = ((self.global_history << 1) + branch_is_taken) & ((1 << self.n) - 1)
+        return p >= 2**(self.n - 1)
     
     def make_prediction(self, address, branch_is_taken) -> bool:
         index = address & ((1 << self.m) - 1)
@@ -891,3 +904,6 @@ def run_predictor(predictor: BranchPredictor, filename: str, return_detailed_out
         return num_predictions, num_mispredictions, detailed_output
 
     return num_predictions, num_mispredictions
+
+
+
