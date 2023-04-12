@@ -384,7 +384,73 @@ class Tage:
         self.allocate_new_provider(address, provider_index)
         return False
 
+class PShare:
+    def __init__(self, m, n):
+        self.m = m
+        self.n = n
+        self.global_history = 0
+        self.local_history_table = [0] * (2**n)
+        self.prediction_table = [[0] * (2**m) for _ in range(2**n)]
 
+    def predict(self, address, outcome):
+        global_history_idx = self.global_history & ((1 << self.n) - 1)
+        local_history_idx = address & ((1 << self.n) - 1)
+        local_history = self.local_history_table[local_history_idx]
+
+        prediction_idx = (global_history_idx << self.m) | local_history
+        prediction = self.prediction_table[prediction_idx]
+
+        if outcome == "T":
+            prediction = min(prediction + 1, (1 << self.m) - 1)
+        else:
+            prediction = max(prediction - 1, 0)
+
+        self.prediction_table[prediction_idx] = prediction
+
+        self.global_history = ((self.global_history << 1) & ((1 << self.n) - 1)) | (outcome == "T")
+        self.local_history_table[local_history_idx] = ((local_history << 1) & ((1 << self.m) - 1)) | (outcome == "T")
+
+        return prediction >= (1 << (self.m - 1))
+    
+    def make_prediction(self, address, branch_is_taken):
+        index = address & ((1 << self.m) - 1)
+        global_history = self.global_history
+        p = self.prediction_table[global_history][index]
+        if branch_is_taken:
+            if p < 2**self.n - 1:
+                self.prediction_table[global_history][index] += 1
+        else:
+            if p > 0:
+                self.prediction_table[global_history][index] -= 1
+        self.global_history = ((self.global_history << 1) + branch_is_taken) & ((1 << self.n) - 1)
+        return p >= 2**(self.n - 1)
+
+class Tournament:
+    def __init__(self, m: int, n: int, k: int = 3):
+        self.gshare = GShare(m, n)
+        self.pshare = PShare(m, k)
+        self.history_table = [0] * (2**n)
+        self.tournament_table = [0] * (2**n)
+
+    def make_prediction(self, address, branch_is_taken):
+        gshare_prediction = self.gshare.predict_taken(address)
+        pshare_prediction = self.pshare.make_prediction(address, branch_is_taken)
+
+        history_index = address & ((1 << self.gshare.n) - 1)
+        winner = self.tournament_table[history_index]
+        if abs(self.gshare.get_counter(address) - self.gshare.threshold) < abs(self.pshare.prediction_table[self.pshare.global_history][address & ((1 << self.pshare.m) - 1)] - (1 << (self.pshare.m - 1))):
+            winner = 0
+        elif abs(self.gshare.get_counter(address) - self.gshare.threshold) > abs(self.pshare.prediction_table[self.pshare.global_history][address & ((1 << self.pshare.m) - 1)] - (1 << (self.pshare.m - 1))):
+            winner = 1
+
+        self.tournament_table[history_index] = winner
+        if winner == 0:
+            self.gshare.make_prediction(address, branch_is_taken)
+        else:
+            self.pshare.predict(address, "T" if branch_is_taken else "NT")
+
+        return gshare_prediction if winner == 0 else pshare_prediction
+    
 class GShare_ML(BranchPredictor):
     def __init__(self, m: int, n: int, method="running_mean") -> None:
         # conda create --name bert python=3.8  
