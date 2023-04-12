@@ -1,7 +1,7 @@
 from time import perf_counter
 import os
 from typing import List, Tuple
-from branch_predictor import Smith, Bimodal, GShare, Hybrid, YehPatt, Tage, GShare_ML, run_predictor, load_instructions
+from branch_predictor import Smith, Bimodal, GShare, Hybrid, YehPatt, Tage, GShare_ML, PShare, Tournament, run_predictor, load_instructions
 from tqdm import tqdm
 
 TRACE_FILES = 'gcc_trace.txt', 'jpeg_trace.txt', 'perl_trace.txt'
@@ -9,7 +9,7 @@ INSTRUCTIONS = [load_instructions(file) for file in TRACE_FILES]
 OUTPUT_FILE = 'benchmarks.csv'
 
 
-headers = ['Tracefile', 'Predictor', 'Predictor Arguments', 'Misprediction Rate', 'Accuracy', 'Precision', 'Recall', 'F1', 'Runtime', 'TP', 'TN', 'FP', 'FN']
+headers = ['Tracefile', 'Predictor', 'Predictor Arguments', 'Misprediction Rate', 'Accuracy', 'Precision', 'Recall', 'F1', 'Runtime', 'TP', 'TN', 'FP', 'FN', 'Size']
 if not os.path.isfile(OUTPUT_FILE):
     header_line = ','.join(headers)
     with open(OUTPUT_FILE, 'w') as f:
@@ -34,10 +34,20 @@ def run_benchmark_one_trace_file(trace_file: str, instructions: List[Tuple[int, 
     recall = true_positive / (true_positive + false_negative)
     f1 = 2 * precision * recall / (precision + recall)
 
+    try:
+        size = predictor.size
+    except Exception:
+        size = None
+
+    if size is None:
+        size = "NA"
+    else:
+        size = str(size)
+
     args_string = ', '.join(str(arg) for arg in predictor_args)
     args_string = f'"{args_string}"'
     data = [trace_file, predictor_class.__name__, args_string, f"{misprediction_rate:.2f}", f"{accuracy:.4f}", f"{precision:.4f}", f"{recall:.4f}", f"{f1:.4f}", f"{runtime:.1f}",
-            true_positive, true_negative, false_positive, false_negative]
+            true_positive, true_negative, false_positive, false_negative, size]
     data_line = ','.join(data)
 
     with open(OUTPUT_FILE, 'a') as f:
@@ -47,7 +57,13 @@ def run_benchmark_one_trace_file(trace_file: str, instructions: List[Tuple[int, 
 
 def run_benchmark(predictor_class, predictor_args: tuple):
     for instructions, trace_file in zip(INSTRUCTIONS, TRACE_FILES):
-        run_benchmark_one_trace_file(trace_file, instructions, predictor_class, predictor_args)
+        try:
+            run_benchmark_one_trace_file(trace_file, instructions, predictor_class, predictor_args)
+        except Exception as e:
+            print()
+            print(f"Error running {predictor_class} with arguments {predictor_args} on trace file {trace_file}")
+            print(e)
+            print()
 
 
 if __name__ == "__main__":
@@ -80,6 +96,14 @@ if __name__ == "__main__":
 
     for args in tqdm(gshare_args, desc="GShare"):
         run_benchmark(GShare, args)
+
+    ### PShare ###
+    for args in tqdm(gshare_args, desc="PShare"):
+        run_benchmark(PShare, args)
+
+    ### Tournament ###
+    for args in tqdm(gshare_args, desc="Tournament"):
+        run_benchmark(Tournament, args)
 
     ## GShare: running_mean ###
     for args in tqdm(gshare_args, desc="GShare_ML Running Mean"):
