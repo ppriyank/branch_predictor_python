@@ -5,6 +5,7 @@ import os
 import functools
 import numpy as np 
 import random 
+from time import perf_counter
 
 # from clusopt_core.cluster import CluStream
 import matplotlib.pyplot as plt
@@ -114,6 +115,8 @@ class S_Kmeans2(S_Kmeans):
 
 		return prediction == branch_is_taken
 
+
+# too much
 class DenStream_Algo():
 	# https://github.com/waylongo/denstream/blob/master/codes/DenStream.py
 	def __init__(self, **args):
@@ -140,6 +143,7 @@ class DenStream_Algo():
 		print(f"Number of o_micro_clusters is {len(self.clusterer.o_micro_clusters)}")
 		print("====")	
 
+# too much
 class DenStream_Algo2():
 	# https://github.com/waylongo/denstream/blob/master/codes/DenStream.py
 	def __init__(self, **args):
@@ -164,6 +168,7 @@ class DenStream_Algo2():
 		print(f"Number of p_micro_clusters is {len(self.centers)}")
 		print("====")	
 
+# too much
 class SOS_Cluster():
 	# https://github.com/ruteee/SOStream/blob/master/notebooks/SOStream%20Teste.ipynb
 	def __init__(self, past=None, dim=22, k=5):
@@ -190,6 +195,9 @@ class SOS_Cluster():
 		print("====")
 		print(f"Buffer:  {len(self.sostream_clustering.M)}")
 		print("====")	
+
+
+
 
 class clusopt():
 	# https://pypi.org/project/clusopt-core/
@@ -338,10 +346,65 @@ class Nearest_Neighbour():
 		print(f"Buffer:  {self.centers}")
 		print("====")	
 
+class Nearest_Pattern():
+	def __init__(self, dim=22, k=5):
+		self.default_pred = True
+		self.centers = [str(1) for i in range(k-1)] 
+		# self.distances = np.array([[0 for i in range(dim)] for j in range(past)])
+		# self.past = past
+		self.k = k 
+		self.sol = {} 
+		self.bucket = [] 
+		for pairs in range(2, self.k+1):
+			for k in range(pairs+1):
+				poss = ["1" for i in range(k)] + ["0" for i in range(pairs - k)]
+				print(poss)
+				self.heapPermutation(poss , pairs)
+
+	def heapPermutation(self, a, size):
+		if size == 1:
+			self.sol["".join(a)] = 0 
+			return a
+
+		for i in range(size):
+			self.heapPermutation(a, size-1)	
+			if size & 1:
+				a[0], a[size-1] = a[size-1], a[0]
+			else:
+				a[i], a[size-1] = a[size-1], a[i]
+	
+	def make_prediction(self, address, branch_is_taken):
+		import pdb
+		pdb.set_trace()
+		addr = bin(address)[2:][-3:]
+		# prediction = self.default_pred
+
+		prediction = 0 
+		for pairs in range(self.k-1):
+			key = self.centers[-1-pairs: ]
+			pred = self.sol["".join(key + ['1'])]  >= self.sol["".join(key + ['0'])] 
+			prediction += int(pred)
+			self.sol["".join(  key + [ str(  int(branch_is_taken)  )] ) ] += 1
+					
+		prediction = prediction / (self.k-1) > 0.5
+		self.centers.pop(0)		
+		self.centers.append( str(  int(branch_is_taken)  ) )
+		
+		return prediction == branch_is_taken
+	
+	def finish(self, num_predictions):
+		print("====")
+		print(f"Buffer:  {self.centers}")
+		print("====")	
+
+
 class River_log():
+	# conda create --name bert python=3.8  
 	# pip install pep517 jsonpatch
-	# pip install git+https://github.com/online-ml/river --upgrade
+	# pip install river
+
 	# https://github.com/online-ml/river
+	# pip install git+https://github.com/online-ml/river --upgrade
 	
 	def __init__(self, category="None", dim=22):
 		from river import (
@@ -441,6 +504,8 @@ def load_instructions(filename: str) -> List[Tuple[int, bool]]:
     
     return instructions
         
+
+
 def run_predictor(predictor, filename: str, return_detailed_output: bool = False) -> Tuple[int, int]:
     instructions = load_instructions(filename)
     num_predictions = len(instructions)
@@ -477,10 +542,30 @@ if __name__ == "__main__":
 	function_name = cfg.algorithm_name
 	trace_file = cfg.trace_file
 	predictor = locals()[function_name](**cfg.additional_args)
+	
+	start = perf_counter()
+	num_predictions, num_mispredictions, detailed_output= run_predictor(predictor, trace_file, return_detailed_output=True)
+	runtime = perf_counter() - start
 
-	num_predictions, num_mispredictions = run_predictor(predictor, trace_file, )
-
+	true_positive = detailed_output[(True, True)]
+	true_negative = detailed_output[(False, False)]
+	false_positive = detailed_output[(False, True)]
+	false_negative = detailed_output[(True, False)]
+	
 	misprediction_rate = 100 * num_mispredictions / num_predictions
+	accuracy = (true_positive + true_negative) / num_predictions
+	precision = true_positive / (true_positive + false_positive)
+	recall = true_positive / (true_positive + false_negative)
+	f1 = 2 * precision * recall / (precision + recall)
+	data_line = {"misprediction_rate": f"{misprediction_rate:.2f}" ,  
+	"accuracy": f"{accuracy:.4f}", 
+	"precision": f"{precision:.4f}",
+	"recall": f"{recall:.4f}",
+	"F1": f"{f1:.4f}", 
+	"Runtime": f"{runtime:.1f}",
+	}
+	
+	print(data_line)
 
 	print(f"number of predictions:		{num_predictions}")
 	print(f"number of mispredictions:	{num_mispredictions}")
