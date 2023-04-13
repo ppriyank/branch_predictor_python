@@ -1,24 +1,26 @@
 from time import perf_counter
 import os
-from branch_predictor import Smith, Bimodal, GShare, Hybrid, YehPatt, Tage, GShare_ML, run_predictor
+from typing import List, Tuple
+from branch_predictor import Smith, Bimodal, GShare, Hybrid, YehPatt, Tage, GShare_ML, PShare, Tournament, run_predictor, load_instructions
 from tqdm import tqdm
 
-trace_files = 'gcc_trace.txt', 'jpeg_trace.txt', 'perl_trace.txt'
-num_trace_files = len(trace_files)
-output_file = 'benchmarks3.csv'
+TRACE_FILES = 'gcc_trace.txt', 'jpeg_trace.txt', 'perl_trace.txt'
+INSTRUCTIONS = [load_instructions(file) for file in TRACE_FILES]
+OUTPUT_FILE = 'benchmarks5.csv'
+no_of_times = 20
 
-headers = ['Tracefile', 'Predictor', 'Predictor Arguments', 'Misprediction Rate', 'Accuracy', 'Precision', 'Recall', 'F1', 'Runtime']
-if not os.path.isfile(output_file):
+headers = ['Tracefile', 'Predictor', 'Predictor Arguments', 'Misprediction Rate', 'Accuracy', 'Precision', 'Recall', 'F1', 'Runtime', 'TP', 'TN', 'FP', 'FN', 'Size']
+if not os.path.isfile(OUTPUT_FILE):
     header_line = ','.join(headers)
-    with open(output_file, 'w') as f:
+    with open(OUTPUT_FILE, 'w') as f:
         f.write(header_line)
         f.write('\n')
 
 
-def run_benchmark(tracefile: str, predictor_class, predictor_name: str, predictor_args: tuple, outputfile: str):
+def run_benchmark_one_trace_file(trace_file: str, instructions: List[Tuple[int, bool]], predictor_class, predictor_args: tuple):
     predictor = predictor_class(*predictor_args)
     start = perf_counter()
-    num_predictions, num_mispredictions, detailed_output = run_predictor(predictor, tracefile, True)
+    num_predictions, num_mispredictions, detailed_output = run_predictor(predictor, trace_file, True, instructions)
     runtime = perf_counter() - start
 
     true_positive = detailed_output[(True, True)]
@@ -32,109 +34,125 @@ def run_benchmark(tracefile: str, predictor_class, predictor_name: str, predicto
     recall = true_positive / (true_positive + false_negative)
     f1 = 2 * precision * recall / (precision + recall)
 
+    try:
+        size = predictor.size
+    except Exception:
+        size = None
+
+    if size is None:
+        size = "NA"
+
     args_string = ', '.join(str(arg) for arg in predictor_args)
     args_string = f'"{args_string}"'
-    data = [tracefile, predictor_name, args_string, f"{misprediction_rate:.2f}", f"{accuracy:.4f}", f"{precision:.4f}", f"{recall:.4f}", f"{f1:.4f}", f"{runtime:.1f}"]
+    data = [trace_file, predictor_class.__name__, args_string, f"{misprediction_rate:.2f}", f"{accuracy:.4f}", f"{precision:.4f}", f"{recall:.4f}", f"{f1:.4f}", f"{runtime:.1f}",
+            f"{true_positive}", f"{true_negative}", f"{false_positive}", f"{false_negative}", f"{size}"]
     data_line = ','.join(data)
 
-    with open(outputfile, 'a') as f:
+    with open(OUTPUT_FILE, 'a') as f:
         f.write(data_line)
         f.write('\n')
 
 
-for i, trace_file in enumerate(trace_files):
-    current_trace_file = i + 1
+def run_benchmark(predictor_class, predictor_args: tuple):
+    for instructions, trace_file in zip(INSTRUCTIONS, TRACE_FILES):
+        try:
+            for i in range(no_of_times):
+                run_benchmark_one_trace_file(trace_file, instructions, predictor_class, predictor_args)
+        except Exception as e:
+            print()
+            print(f"Error running {predictor_class} with arguments {predictor_args} on trace file {trace_file}")
+            print(e)
+            print()
 
+
+if __name__ == "__main__":
     ### Smith ###
-    for counter_bits in tqdm(range(1, 6), desc=f'Smith {current_trace_file} of {num_trace_files}'):
-        run_benchmark(trace_file, Smith, "Smith", (counter_bits,), output_file)
+    for counter_bits in tqdm(range(1, 21), desc="Smith"):
+        run_benchmark(Smith, (counter_bits,))
 
     ### Bimodal ###
-    for m in tqdm(range(2, 17, 2), desc=f'Bimodal {current_trace_file} of {num_trace_files}'):
-        run_benchmark(trace_file, Bimodal, "Bimodal", (m,), output_file)
-
-    ### GShare ###
-    for m in tqdm(range(2, 17, 2), desc=f'GShare {current_trace_file} of {num_trace_files}'):
-        for n in range(2, m + 1, 2):
-            run_benchmark(trace_file, GShare, "GShare", (m, n), output_file)
-
-    ### Hybrid ###
-    for k in tqdm(range(2, 11, 4), desc=f'Hybrid {current_trace_file} of {num_trace_files}'):
-        for m_gshare in range(2, 17, 4):
-            for n in range(2, m_gshare + 1, 4):
-                for m_bimodal in range(2, 17, 4):
-                    run_benchmark(trace_file, Hybrid, "Hybrid", (k, m_gshare, n, m_bimodal), output_file)
-
-    ### YehPatt ###
-    for m in tqdm(range(2, 17, 2), desc=f'YehPatt {current_trace_file} of {num_trace_files}'):
-        for n in range(2, 11, 2):
-            run_benchmark(trace_file, YehPatt, "YehPatt", (m, n), output_file)
+    for m in tqdm(range(1, 21), desc="Bimodal"):
+        run_benchmark(Bimodal, (m,))
 
     ### TAGE ###
-    for m in tqdm(range(2, 17, 2), desc=f'TAGE {current_trace_file} of {num_trace_files}'):
-        run_benchmark(trace_file, Tage, "TAGE", (m,), output_file)
+    for m in tqdm(range(2, 21), desc=f"TAGE"):
+        run_benchmark(Tage, (m,))
 
-    # ## GShare: running_mean ###
-    # for m in tqdm(range(2, 17, 2), desc=f'GShare_ML- {current_trace_file} of {num_trace_files}'):
-    #     for n in range(2, m + 1, 2):
-    #         run_benchmark(trace_file, GShare_ML, "GShare_ML", (m, n, "running_mean"), output_file)
+    ### YehPatt ###
+    yehpatt_args = []
+    for m in range(2, 21, 2):
+        for n in range(2, 21, 2):
+            yehpatt_args.append((m, n))
+
+    for args in tqdm(yehpatt_args, desc="YehPatt"):
+        run_benchmark(YehPatt, args)
+
+    ### GShare ###
+    gshare_args = []
+    for m in range(2, 21, 2):
+        for n in range(2, m + 1, 2):
+            gshare_args.append((m, n))
+
+    for args in tqdm(gshare_args, desc="GShare"):
+        run_benchmark(GShare, args)
+
+    ### PShare ###
+    for args in tqdm(gshare_args, desc="PShare"):
+        run_benchmark(PShare, args)
+
+    ### Tournament ###
+    for args in tqdm(gshare_args, desc="Tournament"):
+        run_benchmark(Tournament, args)
+
+    ## GShare: running_mean ###
+    for args in tqdm(gshare_args, desc="GShare_ML Running Mean"):
+        run_benchmark(GShare_ML, (*args, "running_mean"))
+
+    ### GShare: running_mean 2 ###
+    for args in tqdm(gshare_args, desc="GShare_ML Running Mean 2"):
+        run_benchmark(GShare_ML, (*args, "running_mean2"))
+
+    ### GShare: nearest_pattern ###
+    for args in tqdm(gshare_args, desc="GShare_ML Nearest Pattern"):
+        run_benchmark(GShare_ML, (*args, "nearest_pattern"))
     
-    # ### GShare: running_mean 2 ###
-    # for m in tqdm(range(2, 17, 2), desc=f'GShare_ML- {current_trace_file} of {num_trace_files}'):
-    #     for n in range(2, m + 1, 2):
-    #         run_benchmark(trace_file, GShare_ML, "GShare_ML", (m, n, "running_mean2"), output_file)
-
-    # ### GShare: nearest_pattern ###
-    # for m in tqdm(range(2, 17, 2), desc=f'GShare_ML- {current_trace_file} of {num_trace_files}'):
-    #     for n in range(2, m + 1, 2):
-    #         run_benchmark(trace_file, GShare_ML, "GShare_ML", (m, n, "nearest_pattern"), output_file)
+    ### GShare: nearest_pattern 2 ###
+    for args in tqdm(gshare_args, desc="GShare_ML Nearest Pattern 2"):
+        run_benchmark(GShare_ML, (*args, "nearest_pattern2"))
     
-    # ### GShare: nearest_pattern 2 ###
-    # for m in tqdm(range(2, 17, 2), desc=f'GShare_ML- {current_trace_file} of {num_trace_files}'):
-    #     for n in range(2, m + 1, 2):
-    #         run_benchmark(trace_file, GShare_ML, "GShare_ML", (m, n, "nearest_pattern2"), output_file)
+    ### GShare: logistic ###
+    for args in tqdm(gshare_args, desc="GShare_ML Logistic"):
+        run_benchmark(GShare_ML, (*args, "logistic"))
+
+    ### GShare: logistic 2 ###
+    for args in tqdm(gshare_args, desc="GShare_ML Logistic 2"):
+        run_benchmark(GShare_ML, (*args, "logistic2"))
     
-    # ### GShare: logistic 2 ###
-    # for m in tqdm(range(2, 17, 2), desc=f'GShare_ML- {current_trace_file} of {num_trace_files}'):
-    #     for n in range(2, m + 1, 2):
-    #         run_benchmark(trace_file, GShare_ML, "GShare_ML", (m, n, "logistic"), output_file)
+    ### GShare: Perceptron ###
+    for args in tqdm(gshare_args, desc="GShare_ML Perceptron"):
+        run_benchmark(GShare_ML, (*args, "Perceptron"))
 
-    # ### GShare: logistic 2 ###
-    # for m in tqdm(range(2, 17, 2), desc=f'GShare_ML- {current_trace_file} of {num_trace_files}'):
-    #     for n in range(2, m + 1, 2):
-    #         run_benchmark(trace_file, GShare_ML, "GShare_ML", (m, n, "logistic2"), output_file)
+    ### GShare: Perceptron 2 ###
+    for args in tqdm(gshare_args, desc="GShare_ML Perceptron 2"):
+        run_benchmark(GShare_ML, (*args, "Perceptron2"))
     
-    # ### GShare: Perceptron ###
-    # for m in tqdm(range(2, 17, 2), desc=f'GShare_ML- {current_trace_file} of {num_trace_files}'):
-    #     for n in range(2, m + 1, 2):
-    #         run_benchmark(trace_file, GShare_ML, "GShare_ML", (m, n, "Perceptron"), output_file)
-
-    # ### GShare: Perceptron 2 ###
-    # for m in tqdm(range(2, 17, 2), desc=f'GShare_ML- {current_trace_file} of {num_trace_files}'):
-    #     for n in range(2, m + 1, 2):
-    #         run_benchmark(trace_file, GShare_ML, "GShare_ML", (m, n, "Perceptron2"), output_file)
+    ### GShare: ALMA ###
+    for args in tqdm(gshare_args, desc="GShare_ML ALMA"):
+        run_benchmark(GShare_ML, (*args, "ALMA"))
     
-    # ### GShare: ALMA ###
-    # for m in tqdm(range(2, 17, 2), desc=f'GShare_ML- {current_trace_file} of {num_trace_files}'):
-    #     for n in range(2, m + 1, 2):
-    #         run_benchmark(trace_file, GShare_ML, "GShare_ML", (m, n, "ALMA"), output_file)
-    
-    # ### GShare: ALMA 2 ###
-    # for m in tqdm(range(2, 17, 2), desc=f'GShare_ML- {current_trace_file} of {num_trace_files}'):
-    #     for n in range(2, m + 1, 2):
-    #         run_benchmark(trace_file, GShare_ML, "GShare_ML", (m, n, "ALMA2"), output_file)
+    ### GShare: ALMA 2 ###
+    for args in tqdm(gshare_args, desc="GShare_ML ALMA 2"):
+        run_benchmark(GShare_ML, (*args, "ALMA2"))
 
+    ### Hybrid (takes a *very* long time) ###
+    hybrid_args = []
+    for k in range(11):
+        for m_gshare in range(2, 21, 4):
+            for n in range(2, m_gshare + 1, 4):
+                for m_bimodal in range(2, 21, 4):
+                    hybrid_args.append((k, m_gshare, n, m_bimodal))
 
-    # ### GShare: GaussianNB ###
-    # for m in tqdm(range(2, 17, 2), desc=f'GShare_ML- {current_trace_file} of {num_trace_files}'):
-    #     for n in range(2, m + 1, 2):
-    #         run_benchmark(trace_file, GShare_ML, "GShare_ML", (m, n, "GaussianNB"), output_file)
-    # ### GShare: GaussianNB ###
-
-    # for m in tqdm(range(2, 17, 2), desc=f'GShare_ML- {current_trace_file} of {num_trace_files}'):
-    #     for n in range(2, m + 1, 2):
-    #         run_benchmark(trace_file, GShare_ML, "GShare_ML", (m, n, "GaussianNB2"), output_file)
-
-                
+    for args in tqdm(hybrid_args, desc="Hybrid"):
+        run_benchmark(Hybrid, args)
     
 # python benchmarks.py
