@@ -430,32 +430,23 @@ class PShare:
         prediction = self.prediction_table[self.local_history_table[address & ((1 << self.n) - 1)]][index]
         pshare_prediction = self.pshare_table[address & self.pshare_mask]
         prediction = max(prediction - 1, 0) if pshare_prediction == "NT" else min(prediction + 1, 3)
-        self.update_counters(index, outcome, pshare_prediction)
+        self.update_counters(index, outcome)
         return prediction
     
-    def update_counters(self, index, outcome, pshare_prediction):
-        if outcome == "T":
-            self.gshare_counter = min(self.gshare_counter + 1, 3)
-            if pshare_prediction == "T":
-                self.prediction_table[self.local_history_table[index]][index] = min(self.prediction_table[self.local_history_table[index]][index] + 1, 3)
-            else:
-                self.prediction_table[self.local_history_table[index]][index] = max(self.prediction_table[self.local_history_table[index]][index] - 1, 0)
-                self.pshare_table[self.local_history_table[index]] = "NT"
-        else:
-            self.gshare_counter = max(self.gshare_counter - 1, 0)
-            if pshare_prediction == "T":
-                self.prediction_table[self.local_history_table[index]][index] = max(self.prediction_table[self.local_history_table[index]][index] - 1, 0)
-                self.pshare_table[self.local_history_table[index]] = "NT"
-            else:
-                self.prediction_table[self.local_history_table[index]][index] = min(self.prediction_table[self.local_history_table[index]][index] + 1, 3)
-                
+    def update_counters(self, index, outcome):
+        if index >= len(self.local_history_table):
+            return
+        outcome = bin(self.local_history_table[index]).count('1') >= self.n//2
+        self.prediction_table[self.local_history_table[index]][index] = min(self.prediction_table[self.local_history_table[index]][index] + 1, 3)
+        self.local_history_table[index] = ((self.local_history_table[index] << 1) | int(outcome)) & ((1 << self.n) - 1)
+        self.local_history_table[index] &= (1 << self.n) - 1
+
     def make_prediction(self, address, branch_is_taken):
         index = address % self.table_size
         prediction = self.prediction_table[self.local_history_table[address & ((1 << self.n) - 1)]][index]
         pshare_prediction = self.pshare_table[address & self.pshare_mask]
-        prediction = int(self.prediction_table[index][self.gshare_counter])
         prediction = max(prediction - 1, 0) if pshare_prediction == "NT" else min(prediction + 1, 3)
-        self.update_counters(index, "T" if branch_is_taken else "NT", pshare_prediction)
+        self.update_counters(index, 1 if branch_is_taken else 0)
         return prediction >= 2
 
 class Tournament:
