@@ -414,49 +414,49 @@ class Tage:
         return total_component_size + global_history_bits + self.bimodal.size
 
 class PShare:
-    def __init__(self, m, n) -> None:
+    def __init__(self, m, n):
         self.m = m
         self.n = n
         self.global_history = 0
         self.local_history_table = [0] * (2**n)
         self.prediction_table = [[0] * (2**m) for _ in range(2**n)]
+        self.table_size = 2**m
+        self.gshare_counter = 0
+        self.pshare_mask = (1 << n) - 1
+        self.pshare_table = ["SN" for _ in range(2**n)]
 
-    def predict(self, address, outcome) -> bool:
-        global_history_idx = self.global_history & ((1 << self.n) - 1)
-        local_history_idx = address & ((1 << self.n) - 1)
-        local_history = self.local_history_table[local_history_idx]
-
-        prediction_idx = (global_history_idx << self.m) | local_history
-        prediction = self.prediction_table[prediction_idx]
-
-        if outcome == "T":
-            prediction = min(prediction + 1, (1 << self.m) - 1)
-        else:
-            prediction = max(prediction - 1, 0)
-
-        self.prediction_table[prediction_idx] = prediction
-
-        self.global_history = ((self.global_history << 1) & ((1 << self.n) - 1)) | (outcome == "T")
-        self.local_history_table[local_history_idx] = ((local_history << 1) & ((1 << self.m) - 1)) | (outcome == "T")
-
-        return prediction >= (1 << (self.m - 1))
+    def predict(self, address, outcome):
+        index = address % self.table_size
+        prediction = self.prediction_table[self.local_history_table[address & ((1 << self.n) - 1)]][index]
+        pshare_prediction = self.pshare_table[address & self.pshare_mask]
+        prediction = max(prediction - 1, 0) if pshare_prediction == "NT" else min(prediction + 1, 3)
+        self.update_counters(index, outcome, pshare_prediction)
+        return prediction
     
-    def make_prediction(self, address, branch_is_taken) -> bool:
-        index = address & ((1 << self.m) - 1)
-        global_history = self.global_history
-        p = self.prediction_table[global_history][index]
-        if branch_is_taken:
-            if p < 2**self.n - 1:
-                self.prediction_table[global_history][index] += 1
+    def update_counters(self, index, outcome, pshare_prediction):
+        if outcome == "T":
+            self.gshare_counter = min(self.gshare_counter + 1, 3)
+            if pshare_prediction == "T":
+                self.prediction_table[self.local_history_table[index]][index] = min(self.prediction_table[self.local_history_table[index]][index] + 1, 3)
+            else:
+                self.prediction_table[self.local_history_table[index]][index] = max(self.prediction_table[self.local_history_table[index]][index] - 1, 0)
+                self.pshare_table[self.local_history_table[index]] = "NT"
         else:
-            if p > 0:
-                self.prediction_table[global_history][index] -= 1
-        self.global_history = ((self.global_history << 1) + branch_is_taken) & ((1 << self.n) - 1)
-        return p >= 2**(self.n - 1)
-
-    @property
-    def size(self) -> int:
-        return self.n + len(self.prediction_table) * self.m + len(self.local_history_table) * self.m
+            self.gshare_counter = max(self.gshare_counter - 1, 0)
+            if pshare_prediction == "T":
+                self.prediction_table[self.local_history_table[index]][index] = max(self.prediction_table[self.local_history_table[index]][index] - 1, 0)
+                self.pshare_table[self.local_history_table[index]] = "NT"
+            else:
+                self.prediction_table[self.local_history_table[index]][index] = min(self.prediction_table[self.local_history_table[index]][index] + 1, 3)
+                
+    def make_prediction(self, address, branch_is_taken):
+        index = address % self.table_size
+        prediction = self.prediction_table[self.local_history_table[address & ((1 << self.n) - 1)]][index]
+        pshare_prediction = self.pshare_table[address & self.pshare_mask]
+        prediction = int(self.prediction_table[index][self.gshare_counter])
+        prediction = max(prediction - 1, 0) if pshare_prediction == "NT" else min(prediction + 1, 3)
+        self.update_counters(index, "T" if branch_is_taken else "NT", pshare_prediction)
+        return prediction >= 2
 
 class Tournament:
     def __init__(self, m: int, n: int, k: int = 3) -> None:
