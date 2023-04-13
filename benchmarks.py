@@ -44,7 +44,7 @@ def run_benchmark_one_trace_file(trace_file: str, instructions: List[Tuple[int, 
 
     args_string = ', '.join(str(arg) for arg in predictor_args)
     args_string = f'"{args_string}"'
-    data = [trace_file, predictor_class.__name__, args_string, f"{misprediction_rate:.2f}", f"{accuracy:.4f}", f"{precision:.4f}", f"{recall:.4f}", f"{f1:.4f}", f"{runtime:.1f}",
+    data = [trace_file, predictor_class.__name__, args_string, f"{misprediction_rate:.2f}", f"{accuracy:.4f}", f"{precision:.4f}", f"{recall:.4f}", f"{f1:.4f}", f"{runtime:.2f}",
             f"{true_positive}", f"{true_negative}", f"{false_positive}", f"{false_negative}", f"{size}"]
     data_line = ','.join(data)
 
@@ -52,16 +52,47 @@ def run_benchmark_one_trace_file(trace_file: str, instructions: List[Tuple[int, 
         f.write(data_line)
         f.write('\n')
 
+    return data
+
 
 def run_benchmark(predictor_class, predictor_args: tuple):
+    all_data = []
     for instructions, trace_file in zip(INSTRUCTIONS, TRACE_FILES):
         try:
-            run_benchmark_one_trace_file(trace_file, instructions, predictor_class, predictor_args)
+            data = run_benchmark_one_trace_file(trace_file, instructions, predictor_class, predictor_args)
         except Exception as e:
             print()
             print(f"Error running {predictor_class} with arguments {predictor_args} on trace file {trace_file}")
             print(e)
             print()
+            continue
+
+        tf, name, args, mpr, acc, prec, rec, f1, runtime, tp, tn, fp, fn, size = data
+        data = [tf, name, args, float(mpr), float(acc), float(prec), float(rec), float(f1), float(runtime), int(tp), int(tn), int(fp), int(fn), size if size == "NA" else int(size)]
+        all_data.append(data)
+
+    if len(all_data) < 2:
+        return
+
+    name, args = all_data[0][1:3]
+    size = all_data[0][-1]
+
+    average_data = []
+    for i in range(3, 13):
+        total = 0
+        for data in all_data:
+            total += data[i]
+        avg = total / len(all_data)
+        average_data.append(avg)
+
+    mpr, acc, prec, rec, f1, runtime, tp, tn, fp, fn = average_data
+    data = ['average', name, args, f"{mpr:.2f}", f"{acc:.4f}", f"{prec:.4f}", f"{rec:.4f}", f"{f1:.4f}", f"{runtime:.2f}", 
+            f"{tp:.2f}", f"{tn:.2f}", f"{fp:.2f}", f"{fn:.2f}", f"{size}"]
+    data_line = ','.join(data)
+
+    with open(OUTPUT_FILE, 'a') as f:
+        f.write(data_line)
+        f.write('\n')
 
 
 if __name__ == "__main__":
