@@ -2,7 +2,7 @@ import math
 import os
 from random import randint
 from itertools import cycle
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 from abc import abstractmethod
 import numpy as np
 
@@ -12,6 +12,7 @@ class BranchPredictor:
     A base class to handle the functionality that all branch predictors have in common.
     """
     def __init__(self, m: int, counter_bits: int = 3) -> None:
+        self.counter_bits = counter_bits
         self.counter_max = 2 ** counter_bits - 1
         self.threshold = 2 ** (counter_bits - 1)
         self.prediction_table = np.full(2 ** m, self.threshold)
@@ -52,6 +53,10 @@ class BranchPredictor:
     @abstractmethod
     def get_prediction_index(self, address: int) -> int:
         pass
+
+    @property
+    def size(self) -> Optional[int]:
+        return len(self.prediction_table) * self.counter_bits
 
 
 class Smith(BranchPredictor):
@@ -128,6 +133,10 @@ class GShare(BranchPredictor):
         self.update_history(branch_is_taken)
         return prediction_is_correct
 
+    @property
+    def size(self) -> int:
+        return super().size + self.n
+
 
 class Hybrid:
     """
@@ -187,10 +196,15 @@ class Hybrid:
         self.update_chooser_table(address, gshare_is_correct, bimodal_is_correct)
         return prediction_is_correct
 
+    @property
+    def size(self) -> int:
+        return self.bimodal.size + self.gshare.size + len(self.chooser_table) * 2
+
 
 class YehPatt(BranchPredictor):
     def __init__(self, m: int, n: int) -> None:
         super().__init__(n)
+        self.n = n
         self.history_table = np.zeros(2 ** m, dtype=int)
         self.rightmost_m_bits = 2 ** m - 1
         self.nth_bit_from_the_right = 1 << (n-1)
@@ -226,10 +240,15 @@ class YehPatt(BranchPredictor):
         prediction_is_correct = super().make_prediction(address, branch_is_taken)
         self.update_history(address, branch_is_taken)
         return prediction_is_correct
-        
+
+    @property
+    def size(self) -> int:
+        return super().size + len(self.history_table) * self.n 
 
 class TageComponent:
     def __init__(self, history_len: int, counter_bits: int = 2) -> None:
+        self.tag_len = history_len
+        self.counter_bits = counter_bits
         self.history_mask = 2 ** history_len - 1
         self.counter_max = 2 ** counter_bits - 1
         self.threshold = 2 ** (counter_bits - 1)
@@ -273,8 +292,12 @@ class TageComponent:
         self.set_tag(address, history)
 
     @property
-    def prediction(self):
+    def prediction(self) -> bool:
         return self.counter >= self.threshold
+
+    @property
+    def size(self) -> int:
+        return self.tag_len + self.counter_bits + 2 
 
 
 class Tage:
@@ -384,15 +407,21 @@ class Tage:
         self.allocate_new_provider(address, provider_index)
         return False
 
+    @property
+    def size(self) -> int:
+        total_component_size = sum([component.size for component in self.tage_components])
+        global_history_bits = self.tage_components[-1].tag_len
+        return total_component_size + global_history_bits + self.bimodal.size
+
 class PShare:
-    def __init__(self, m, n):
+    def __init__(self, m, n) -> None:
         self.m = m
         self.n = n
         self.global_history = 0
         self.local_history_table = [0] * (2**n)
         self.prediction_table = [[0] * (2**m) for _ in range(2**n)]
 
-    def predict(self, address, outcome):
+    def predict(self, address, outcome) -> bool:
         global_history_idx = self.global_history & ((1 << self.n) - 1)
         local_history_idx = address & ((1 << self.n) - 1)
         local_history = self.local_history_table[local_history_idx]
@@ -412,7 +441,7 @@ class PShare:
 
         return prediction >= (1 << (self.m - 1))
     
-    def make_prediction(self, address, branch_is_taken):
+    def make_prediction(self, address, branch_is_taken) -> bool:
         index = address & ((1 << self.m) - 1)
         global_history = self.global_history
         p = self.prediction_table[global_history][index]
@@ -425,14 +454,18 @@ class PShare:
         self.global_history = ((self.global_history << 1) + branch_is_taken) & ((1 << self.n) - 1)
         return p >= 2**(self.n - 1)
 
+    @property
+    def size(self) -> int:
+        return self.n + len(self.prediction_table) * self.m + len(self.local_history_table) * self.m
+
 class Tournament:
-    def __init__(self, m: int, n: int, k: int = 3):
+    def __init__(self, m: int, n: int, k: int = 3) -> None:
         self.gshare = GShare(m, n)
         self.pshare = PShare(m, k)
         self.history_table = [0] * (2**n)
         self.tournament_table = [0] * (2**n)
 
-    def make_prediction(self, address, branch_is_taken):
+    def make_prediction(self, address, branch_is_taken) -> bool:
         gshare_prediction = self.gshare.predict_taken(address)
         pshare_prediction = self.pshare.make_prediction(address, branch_is_taken)
 
@@ -451,6 +484,10 @@ class Tournament:
 
         return gshare_prediction if winner == 0 else pshare_prediction
     
+    @property
+    def size(self) -> int:
+        return self.gshare.size + self.pshare.size + len(self.tournament_table)
+    
 class GShare_ML(BranchPredictor):
     def __init__(self, m: int, n: int, method="running_mean") -> None:
         # conda create --name bert python=3.8  
@@ -458,8 +495,8 @@ class GShare_ML(BranchPredictor):
         # pip install river
 
         from river import (
-			compose, linear_model, metrics, preprocessing, forest, 
-			ensemble, model_selection, tree, naive_bayes, neighbors, utils)
+            compose, linear_model, metrics, preprocessing, forest, 
+            ensemble, model_selection, tree, naive_bayes, neighbors, utils)
         self.normalization = True
         self.branch_history = 0
         self.n = n
@@ -563,7 +600,7 @@ class GShare_ML(BranchPredictor):
                 a[0], a[size-1] = a[size-1], a[0]
             else:
                 a[i], a[size-1] = a[size-1], a[i]
-	
+    
     def get_prediction_index(self, address: int) -> int:
         return ((address >> 2) & self.rightmost_m_bits) ^ self.branch_history
 
@@ -655,7 +692,7 @@ class GShare_ML(BranchPredictor):
             prediction += int(pred)
             self.sol[prediction_index][ key + str(  int(branch_is_taken)  ) ] += 1
         prediction = prediction / (self.k-1) > 0.5
-        centers.pop(0)		
+        centers.pop(0)      
         centers.append( str(  int(branch_is_taken)  ) )
         self.centers[prediction_index] = centers
     
@@ -796,7 +833,9 @@ class GShare_ML(BranchPredictor):
         self.update_history(branch_is_taken)
         return prediction_is_correct
 
-
+    @property
+    def size(self) -> Optional[int]:
+        return None
 
 
 def load_instructions(filename: str) -> List[Tuple[int, bool]]:
@@ -819,13 +858,14 @@ def load_instructions(filename: str) -> List[Tuple[int, bool]]:
     return instructions
         
 
-def run_predictor(predictor: BranchPredictor, filename: str, return_detailed_output: bool = False) -> Tuple[int, int]:
+def run_predictor(predictor: BranchPredictor, filename: str, return_detailed_output: bool = False, instructions: Optional[List[Tuple[int, bool]]] = None) -> Tuple[int, int]:
     """
     Given an instance of a predictor and the filename of a trace file,
     runs all the branch instructions from the trace file through the predictor
     and returns the total number of predictions and the number of incorrect predictions.
     """
-    instructions = load_instructions(filename)
+    if instructions is None:
+        instructions = load_instructions(filename)
     num_predictions = len(instructions)
     num_mispredictions = 0
 
@@ -851,45 +891,3 @@ def run_predictor(predictor: BranchPredictor, filename: str, return_detailed_out
         return num_predictions, num_mispredictions, detailed_output
 
     return num_predictions, num_mispredictions
-
-
-class PShare:
-    def __init__(self, m, n):
-        self.m = m
-        self.n = n
-        self.global_history = 0
-        self.local_history_table = [0] * (2**n)
-        self.prediction_table = [[0] * (2**m) for _ in range(2**n)]
-
-    def predict(self, address, outcome):
-        global_history_idx = self.global_history & ((1 << self.n) - 1)
-        local_history_idx = address & ((1 << self.n) - 1)
-        local_history = self.local_history_table[local_history_idx]
-
-        prediction_idx = (global_history_idx << self.m) | local_history
-        prediction = self.prediction_table[prediction_idx]
-
-        if outcome == "T":
-            prediction = min(prediction + 1, (1 << self.m) - 1)
-        else:
-            prediction = max(prediction - 1, 0)
-
-        self.prediction_table[prediction_idx] = prediction
-
-        self.global_history = ((self.global_history << 1) & ((1 << self.n) - 1)) | (outcome == "T")
-        self.local_history_table[local_history_idx] = ((local_history << 1) & ((1 << self.m) - 1)) | (outcome == "T")
-
-        return prediction >= (1 << (self.m - 1))
-    
-    def make_prediction(self, address, branch_is_taken):
-        index = address & ((1 << self.m) - 1)
-        global_history = self.global_history
-        p = self.prediction_table[global_history][index]
-        if branch_is_taken:
-            if p < 2**self.n - 1:
-                self.prediction_table[global_history][index] += 1
-        else:
-            if p > 0:
-                self.prediction_table[global_history][index] -= 1
-        self.global_history = ((self.global_history << 1) + branch_is_taken) & ((1 << self.n) - 1)
-        return p >= 2**(self.n - 1)
