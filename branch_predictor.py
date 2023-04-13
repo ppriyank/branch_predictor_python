@@ -456,7 +456,7 @@ class GShare_ML(BranchPredictor):
         # conda create --name bert python=3.8  
         # pip install pep517 jsonpatch
         # pip install river
-
+        
         from river import (
 			compose, linear_model, metrics, preprocessing, forest, 
 			ensemble, model_selection, tree, naive_bayes, neighbors, utils)
@@ -468,90 +468,74 @@ class GShare_ML(BranchPredictor):
         # import pdb
         # pdb.set_trace()
         # self.__dict__
+
+        super().__init__(m, counter_bits=3)
+
         if method == "running_mean":
-            super().__init__(m, counter_bits=3)
             print("Running Mean!!")
             self.count = np.zeros(total_entries)
             self.running_mean_vals = np.full(total_entries, self.threshold)
             self.make_model_prediction = self.running_mean
         elif method == "running_mean2":
-            super().__init__(m, counter_bits=3)
             print("Running Mean 2 !!")
             self.alpha = 0.75
             self.running_mean_vals = np.full(2 ** m, self.threshold)
             self.make_model_prediction = self.running_mean2
-        elif method == "skmeans":
-            super().__init__(m, counter_bits=3)
-            import random
-            self.alpha = 0.75
-            dim = 22
-            n_cluster = 2
-            # self.prediction_table = np.array([[  [random.choice([0,1]) for i in range(dim)] for e in range (n_cluster) ] for x in range(total_entries)])
-            # self.labels = [[{False: 0, True: 0} for i in range(n_cluster)] for i in range(total_entries)]
-            self.prediction_table = np.array([  [random.choice([0,1]) for i in range(dim)] for e in range (total_entries) ])
-            self.labels = [{False: 0, True: 0} for i in range(total_entries)]
-            self.make_model_prediction = self.skmeans2            
         elif method == "nearest_pattern" or method == "nearest_pattern2":
-            super().__init__(m, counter_bits=1)
             print("...Nearest Pattern....")
             del self.counter_max, self.threshold, self.prediction_table
             self.make_model_prediction = self.nearest_pattern
             self.k = 3
             self.sol = [{} for i in range(total_entries)]
             self.centers = [['1' for j in range(self.k)] for i in range(total_entries)]
-            
             for pairs in range(2, self.k+1):
                 for k in range(pairs+1):
                     poss = ["1" for i in range(k)] + ["0" for i in range(pairs - k)]
                     self.heapPermutation(poss , pairs)
-            
             if method == "nearest_pattern2":
                 del self.centers
                 self.make_model_prediction = self.nearest_pattern2
-
         elif method == "logistic":
-            super().__init__(m, counter_bits=3)
+            del self.counter_max, self.threshold, self.prediction_table
             self.prediction_table = [compose.Pipeline(linear_model.LogisticRegression()) for i in range(total_entries)]
             self.make_model_prediction = self.river_prediction            
         elif method == "logistic2":
-            super().__init__(m, counter_bits=3)
+            del self.counter_max, self.threshold, self.prediction_table
             self.prediction_table = compose.Pipeline(linear_model.LogisticRegression())
             self.make_model_prediction = self.river_prediction2            
         elif method == "Perceptron":
-            super().__init__(m, counter_bits=3)
+            del self.counter_max, self.threshold, self.prediction_table
             self.prediction_table = [compose.Pipeline(linear_model.Perceptron()) for i in range(total_entries)]
             self.make_model_prediction = self.river_prediction            
         elif method == "Perceptron2":
-            super().__init__(m, counter_bits=3)
+            del self.counter_max, self.threshold, self.prediction_table
             self.prediction_table = compose.Pipeline(linear_model.Perceptron())
             self.make_model_prediction = self.river_prediction2            
         elif method == "ALMA":
-            super().__init__(m, counter_bits=3)
+            del self.counter_max, self.threshold, self.prediction_table
             self.prediction_table = [compose.Pipeline(linear_model.ALMAClassifier()) for i in range(total_entries)]
             self.make_model_prediction = self.river_prediction            
         elif method == "ALMA2":
-            super().__init__(m, counter_bits=3)
+            del self.counter_max, self.threshold, self.prediction_table
             self.prediction_table = compose.Pipeline(compose.Pipeline(linear_model.ALMAClassifier()))
             self.make_model_prediction = self.river_prediction2            
+        ######################## doesnt work ########################
         elif method == "HoeffdingAdaptiveTreeClassifier":
-            super().__init__(m, counter_bits=3)
             self.prediction_table = [compose.Pipeline(tree.HoeffdingAdaptiveTreeClassifier()) for i in range(total_entries)]
             self.make_model_prediction = self.river_prediction3            
         elif method == "HoeffdingAdaptiveTreeClassifier2":
-            super().__init__(m, counter_bits=3)
             self.prediction_table = compose.Pipeline(tree.HoeffdingAdaptiveTreeClassifier())
             self.make_model_prediction = self.river_prediction4            
         elif method == "GaussianNB":
-            super().__init__(m, counter_bits=3)
             self.normalization = False
             self.prediction_table = [compose.Pipeline(naive_bayes.GaussianNB()) for i in range(total_entries)]
             self.make_model_prediction = self.river_prediction3            
         elif method == "GaussianNB2":
-            super().__init__(m, counter_bits=3)
             self.normalization = False
             self.prediction_table = compose.Pipeline(naive_bayes.GaussianNB())
             self.make_model_prediction = self.river_prediction4            
-        
+        ######################## doesnt work ########################
+
     def heapPermutation(self, a, size):
         if size == 1:
             for i in range(len(self.sol)):
@@ -608,42 +592,6 @@ class GShare_ML(BranchPredictor):
 
         return prediction == branch_is_taken
 
-    def skmeans(self, prediction_index, branch_is_taken, address=None):
-        centers = self.prediction_table[prediction_index]
-        addr = bin(address)[2:]
-        addr = np.array([int(e) for e in addr])
-        distances = np.linalg.norm(address - centers, ord=2, axis=1.)
-        assigned_cluster = np.argmin(distances)
-        
-        stats = self.labels[prediction_index][assigned_cluster]
-        print(stats)
-        prediction = stats[True] >= stats[False] 
-
-        temp_center = centers[assigned_cluster]
-        temp_center = temp_center + self.alpha * (address - temp_center)
-        
-        self.prediction_table[prediction_index][assigned_cluster] = temp_center
-        self.labels[prediction_index][assigned_cluster][branch_is_taken] += 1
-        
-        return prediction == branch_is_taken
-    
-    def skmeans2(self, prediction_index, branch_is_taken, address=None):
-        addr = bin(address)[2:]
-        addr = np.array([int(e) for e in addr])
-        distances = np.linalg.norm(addr - self.prediction_table, ord=1, axis=1.)
-        assigned_cluster = np.argmin(distances)
-        
-        stats = self.labels[assigned_cluster]
-        prediction = stats[True] >= stats[False] 
-
-        temp_center = self.prediction_table[assigned_cluster]
-        temp_center = temp_center + self.alpha * (address - temp_center)
-        
-        self.prediction_table[assigned_cluster] = temp_center
-        self.labels[assigned_cluster][branch_is_taken] += 1
-        
-        return prediction == branch_is_taken
-    
     def nearest_pattern(self, prediction_index, branch_is_taken, address=None):
         prediction = 0 
         current_dict = self.sol[prediction_index]
@@ -788,7 +736,6 @@ class GShare_ML(BranchPredictor):
 
         return prediction == branch_is_taken
     
-    
     def make_prediction(self, address: int, branch_is_taken: bool) -> bool:
         prediction_index = self.get_prediction_index(address)
         prediction_is_correct = self.make_model_prediction(prediction_index, branch_is_taken, address)
@@ -796,6 +743,81 @@ class GShare_ML(BranchPredictor):
         self.update_history(branch_is_taken)
         return prediction_is_correct
 
+
+class Stream_Clustering():
+    def __init__(self, m: int, n: int, method="skmean2") -> None:        
+        
+        self.branch_history = 0
+        self.n = n
+        self.nth_bit_from_the_right = 1 << (n-1)
+        self.m = m 
+        self.alpha = 0.25
+        
+        self.intial_cluster=  0 
+        self.labels = [{False: 0, True: 0} for i in range(m)]
+        if method == "skmean2":
+            dim = 22
+            self.prediction_table = np.array([  [0 for i in range(dim)] for e in range (m) ])
+            self.make_model_prediction = self.skmeans2            
+        else:
+            self.prediction_table = np.array([  [0 for i in range(self.n)] for e in range (m) ])
+            self.make_model_prediction = self.skmeans            
+        
+    def update_history(self, branch_is_taken: bool) -> None:
+        self.branch_history >>= 1
+        if branch_is_taken:
+            self.branch_history |= self.nth_bit_from_the_right
+
+    def skmeans(self, branch_is_taken, address=None):
+        addr = bin(self.branch_history)[2:]
+        addr = np.array([0] * (self.n - len(addr)) + [int(e) for e in addr])
+        
+        if self.intial_cluster < self.m :
+            assigned_cluster = self.intial_cluster
+            self.intial_cluster += 1
+        else:
+            distances = np.linalg.norm(addr - self.prediction_table, ord=1, axis=1.)
+            assigned_cluster = np.argmin(distances)
+        
+        stats = self.labels[assigned_cluster]
+        prediction = stats[True] >= stats[False] 
+        
+        temp_center = self.prediction_table[assigned_cluster]
+        temp_center = temp_center + self.alpha * (address - temp_center)
+        
+        self.prediction_table[assigned_cluster] = temp_center
+        self.labels[assigned_cluster][branch_is_taken] += 1
+        
+        return prediction == branch_is_taken
+    
+    def skmeans2(self, branch_is_taken, address=None):
+        
+        addr = bin(address)[2:]
+        addr = np.array([int(e) for e in addr])
+        
+        if self.intial_cluster < self.m :
+            assigned_cluster = self.intial_cluster
+            self.intial_cluster += 1
+        else:
+            distances = np.linalg.norm(addr - self.prediction_table, ord=1, axis=1.)
+            assigned_cluster = np.argmin(distances)
+        
+        stats = self.labels[assigned_cluster]
+        prediction = stats[True] >= stats[False] 
+        
+        temp_center = self.prediction_table[assigned_cluster]
+        temp_center = temp_center + self.alpha * (address - temp_center)
+        
+        self.prediction_table[assigned_cluster] = temp_center
+        self.labels[assigned_cluster][branch_is_taken] += 1
+        
+        return prediction == branch_is_taken
+    
+    def make_prediction(self, address: int, branch_is_taken: bool) -> bool:
+        prediction_is_correct = self.make_model_prediction(branch_is_taken, address)
+
+        self.update_history(branch_is_taken)
+        return prediction_is_correct
 
 
 
