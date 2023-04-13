@@ -15,7 +15,7 @@ class BranchPredictor:
         self.counter_bits = counter_bits
         self.counter_max = 2 ** counter_bits - 1
         self.threshold = 2 ** (counter_bits - 1)
-        self.prediction_table = np.full(2 ** m, self.threshold)
+        self.prediction_table = [self.threshold] * 2 ** m
         self.rightmost_m_bits = 2 ** m - 1
 
     def get_counter(self, address: int = 0) -> int:
@@ -93,7 +93,7 @@ class Bimodal(BranchPredictor):
         The rightmost m bits of the address, not including the final 2 bits which are always 0, are used
         as the index in the prediction table.
         """
-        return (address >> 2) & self.rightmost_m_bits
+        return address & self.rightmost_m_bits
 
 
 class GShare(BranchPredictor):
@@ -115,7 +115,7 @@ class GShare(BranchPredictor):
         The rightmost m bits of the address, not including the final 2 bits which are always 0, are XORed
         with the branch history to calculate the index in the prediciton table.
         """
-        return ((address >> 2) & self.rightmost_m_bits) ^ self.branch_history
+        return (address & self.rightmost_m_bits) ^ self.branch_history
 
     def update_history(self, branch_is_taken: bool) -> None:
         """
@@ -146,7 +146,7 @@ class Hybrid:
     In other words, think of it as "implementing the BranchPredictor interface".
     """
     def __init__(self, k: int, m_gshare: int, n: int, m_bimodal: int) -> None:
-        self.chooser_table = np.full(2 ** k, 1)
+        self.chooser_table = [1] * 2 ** k
         self.rightmost_k_bits = 2 ** k - 1
         self.gshare = GShare(m_gshare, n)
         self.bimodal = Bimodal(m_bimodal)
@@ -156,7 +156,7 @@ class Hybrid:
         Returns true if the hybrid predictor would use GShare to predict for the given address,
         False if it would use Bimodal.
         """
-        chooser_index = (address >> 2) & self.rightmost_k_bits
+        chooser_index = address & self.rightmost_k_bits
         chooser = self.chooser_table[chooser_index]
         return chooser >= 2
         
@@ -167,7 +167,7 @@ class Hybrid:
         if gshare_is_correct == bimodal_is_correct:
             return
 
-        chooser_index = (address >> 2) & self.rightmost_k_bits
+        chooser_index = address & self.rightmost_k_bits
         chooser = self.chooser_table[chooser_index]
 
         if gshare_is_correct and chooser < 3:
@@ -205,7 +205,7 @@ class YehPatt(BranchPredictor):
     def __init__(self, m: int, n: int) -> None:
         super().__init__(n)
         self.n = n
-        self.history_table = np.zeros(2 ** m, dtype=int)
+        self.history_table = [0] * 2 ** m
         self.rightmost_m_bits = 2 ** m - 1
         self.nth_bit_from_the_right = 1 << (n-1)
 
@@ -214,7 +214,7 @@ class YehPatt(BranchPredictor):
         The rightmost m bits of the address, not including the final 2 bits which are always 0, are used
         as the index in the history table. 
         """
-        return (address >> 2) & self.rightmost_m_bits
+        return address & self.rightmost_m_bits
 
     def get_prediction_index(self, address: int) -> int:
         """
@@ -257,7 +257,7 @@ class TageComponent:
         self.useful = 0
 
     def create_tag(self, address: int, history: int) -> int:
-        return (address >> 2) ^ (history & self.history_mask)
+        return address ^ (history & self.history_mask)
 
     def set_tag(self, address: int, history: int) -> None:
         self.tag = self.create_tag(address, history)
@@ -602,7 +602,7 @@ class GShare_ML(BranchPredictor):
                 a[i], a[size-1] = a[size-1], a[i]
     
     def get_prediction_index(self, address: int) -> int:
-        return ((address >> 2) & self.rightmost_m_bits) ^ self.branch_history
+        return (address & self.rightmost_m_bits) ^ self.branch_history
 
     def update_history(self, branch_is_taken: bool) -> None:
         self.branch_history >>= 1
@@ -853,7 +853,7 @@ def load_instructions(filename: str) -> List[Tuple[int, bool]]:
     with open(filename, 'r') as f:
         lines = f.readlines()
 
-    instructions = [(int(line[:6], 16), line[7] == 't') for line in lines]
+    instructions = [(int(line[:6], 16) >> 2, line[7] == 't') for line in lines]
     
     return instructions
         
@@ -891,45 +891,3 @@ def run_predictor(predictor: BranchPredictor, filename: str, return_detailed_out
         return num_predictions, num_mispredictions, detailed_output
 
     return num_predictions, num_mispredictions
-
-
-# class PShare:
-#     def __init__(self, m, n):
-#         self.m = m
-#         self.n = n
-#         self.global_history = 0
-#         self.local_history_table = [0] * (2**n)
-#         self.prediction_table = [[0] * (2**m) for _ in range(2**n)]
-
-#     def predict(self, address, outcome):
-#         global_history_idx = self.global_history & ((1 << self.n) - 1)
-#         local_history_idx = address & ((1 << self.n) - 1)
-#         local_history = self.local_history_table[local_history_idx]
-
-#         prediction_idx = (global_history_idx << self.m) | local_history
-#         prediction = self.prediction_table[prediction_idx]
-
-#         if outcome == "T":
-#             prediction = min(prediction + 1, (1 << self.m) - 1)
-#         else:
-#             prediction = max(prediction - 1, 0)
-
-#         self.prediction_table[prediction_idx] = prediction
-
-#         self.global_history = ((self.global_history << 1) & ((1 << self.n) - 1)) | (outcome == "T")
-#         self.local_history_table[local_history_idx] = ((local_history << 1) & ((1 << self.m) - 1)) | (outcome == "T")
-
-#         return prediction >= (1 << (self.m - 1))
-    
-#     def make_prediction(self, address, branch_is_taken):
-#         index = address & ((1 << self.m) - 1)
-#         global_history = self.global_history
-#         p = self.prediction_table[global_history][index]
-#         if branch_is_taken:
-#             if p < 2**self.n - 1:
-#                 self.prediction_table[global_history][index] += 1
-#         else:
-#             if p > 0:
-#                 self.prediction_table[global_history][index] -= 1
-#         self.global_history = ((self.global_history << 1) + branch_is_taken) & ((1 << self.n) - 1)
-#         return p >= 2**(self.n - 1)
