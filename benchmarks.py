@@ -68,21 +68,21 @@ def run_benchmark(predictor_class, predictor_args: tuple):
 
 if __name__ == "__main__":
     ### Smith ###
-    for counter_bits in tqdm(range(1, 21), desc="Smith"):
+    for counter_bits in tqdm(range(1, 17), desc="Smith"):
         run_benchmark(Smith, (counter_bits,))
 
     ### Bimodal ###
-    for m in tqdm(range(1, 21), desc="Bimodal"):
+    for m in tqdm(range(1, 17), desc="Bimodal"):
         run_benchmark(Bimodal, (m,))
 
     ### TAGE ###
-    for m in tqdm(range(2, 21), desc=f"TAGE"):
+    for m in tqdm(range(2, 17), desc=f"TAGE"):
         run_benchmark(Tage, (m,))
 
     ### YehPatt ###
     yehpatt_args = []
-    for m in range(2, 21, 2):
-        for n in range(2, 21, 2):
+    for m in range(2, 17, 2):
+        for n in range(2, 17, 2):
             yehpatt_args.append((m, n))
 
     for args in tqdm(yehpatt_args, desc="YehPatt"):
@@ -90,7 +90,7 @@ if __name__ == "__main__":
 
     ### GShare ###
     gshare_args = []
-    for m in range(2, 21, 2):
+    for m in range(2, 17, 2):
         for n in range(2, m + 1, 2):
             gshare_args.append((m, n))
 
@@ -105,6 +105,10 @@ if __name__ == "__main__":
     for args in tqdm(gshare_args, desc="Tournament"):
         run_benchmark(Tournament, args)
 
+    
+    
+    
+    
     ## GShare: running_mean ###
     for args in tqdm(gshare_args, desc="GShare_ML Running Mean"):
         run_benchmark(GShare_ML, (*args, "running_mean"))
@@ -148,9 +152,9 @@ if __name__ == "__main__":
     ### Hybrid (takes a *very* long time) ###
     hybrid_args = []
     for k in range(11):
-        for m_gshare in range(2, 21, 4):
+        for m_gshare in range(2, 17, 4):
             for n in range(2, m_gshare + 1, 4):
-                for m_bimodal in range(2, 21, 4):
+                for m_bimodal in range(2, 17, 4):
                     hybrid_args.append((k, m_gshare, n, m_bimodal))
 
     for args in tqdm(hybrid_args, desc="Hybrid"):
