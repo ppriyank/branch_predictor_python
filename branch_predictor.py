@@ -488,71 +488,69 @@ class Tournament:
     def size(self) -> int:
         return self.gshare.size + self.pshare.size + len(self.tournament_table)
     
-class GShare_ML(BranchPredictor):
-    def __init__(self, m: int, n: int, method="running_mean") -> None:
-        # conda create --name bert python=3.8  
-        # pip install pep517 jsonpatch
-        # pip install river
-        
+class GShare_ML(GShare):
+    def __init__(self, m: int, n: int, method="running_mean", normalization=True) -> None:
+        super().__init__(m, n)
+
         from river import (
             compose, linear_model, metrics, preprocessing, forest, 
             ensemble, model_selection, tree, naive_bayes, neighbors, utils)
-        self.normalization = True
-        self.branch_history = 0
-        self.n = n
-        self.nth_bit_from_the_right = 1 << (n-1)
+        self.normalization = normalization
         total_entries = 2 ** m
-        # import pdb
-        # pdb.set_trace()
-        # self.__dict__
-
-        super().__init__(m, counter_bits=3)
+        self.dim = 22
 
         if method == "running_mean":
             print("Running Mean!!")
-            self.count = np.zeros(total_entries)
-            self.running_mean_vals = np.full(total_entries, self.threshold)
+            self.count = [0 for i in range(total_entries) ]
+            self.running_mean_vals = [self.threshold for i in range(total_entries)]
             self.make_model_prediction = self.running_mean
         elif method == "running_mean2":
             print("Running Mean 2 !!")
             self.alpha = 0.75
-            self.running_mean_vals = np.full(2 ** m, self.threshold)
+            self.running_mean_vals = [self.threshold for i in range(total_entries)]
             self.make_model_prediction = self.running_mean2
         elif method == "nearest_pattern" or method == "nearest_pattern2":
             print("...Nearest Pattern....")
+            del self.counter_bits, self.normalization
             del self.counter_max, self.threshold, self.prediction_table
-            self.make_model_prediction = self.nearest_pattern
             self.k = 3
             self.sol = [{} for i in range(total_entries)]
-            self.centers = [['1' for j in range(self.k)] for i in range(total_entries)]
             for pairs in range(2, self.k+1):
                 for k in range(pairs+1):
                     poss = ["1" for i in range(k)] + ["0" for i in range(pairs - k)]
                     self.heapPermutation(poss , pairs)
             if method == "nearest_pattern2":
-                del self.centers
                 self.make_model_prediction = self.nearest_pattern2
+            else:
+                self.centers = [['1' for j in range(self.k)] for i in range(total_entries)]
+                self.make_model_prediction = self.nearest_pattern
         elif method == "logistic":
+            del self.counter_bits, self.normalization
             del self.counter_max, self.threshold, self.prediction_table
             self.prediction_table = [compose.Pipeline(linear_model.LogisticRegression()) for i in range(total_entries)]
             self.make_model_prediction = self.river_prediction            
         elif method == "logistic2":
+            del self.counter_bits, self.normalization
             del self.counter_max, self.threshold, self.prediction_table
             self.prediction_table = compose.Pipeline(linear_model.LogisticRegression())
             self.make_model_prediction = self.river_prediction2            
         elif method == "Perceptron":
+            del self.counter_bits, self.normalization
             del self.counter_max, self.threshold, self.prediction_table
             self.prediction_table = [compose.Pipeline(linear_model.Perceptron()) for i in range(total_entries)]
             self.make_model_prediction = self.river_prediction            
         elif method == "Perceptron2":
+            del self.counter_bits, self.normalization
             del self.counter_max, self.threshold, self.prediction_table
             self.prediction_table = compose.Pipeline(linear_model.Perceptron())
             self.make_model_prediction = self.river_prediction2            
         elif method == "ALMA":
+            del self.counter_bits, self.normalization
             del self.counter_max, self.threshold, self.prediction_table
             self.prediction_table = [compose.Pipeline(linear_model.ALMAClassifier()) for i in range(total_entries)]
             self.make_model_prediction = self.river_prediction            
         elif method == "ALMA2":
+            del self.counter_bits, self.normalization
             del self.counter_max, self.threshold, self.prediction_table
             self.prediction_table = compose.Pipeline(compose.Pipeline(linear_model.ALMAClassifier()))
             self.make_model_prediction = self.river_prediction2            
@@ -585,14 +583,6 @@ class GShare_ML(BranchPredictor):
             else:
                 a[i], a[size-1] = a[size-1], a[i]
     
-    def get_prediction_index(self, address: int) -> int:
-        return (address & self.rightmost_m_bits) ^ self.branch_history
-
-    def update_history(self, branch_is_taken: bool) -> None:
-        self.branch_history >>= 1
-        if branch_is_taken:
-            self.branch_history |= self.nth_bit_from_the_right
-
     def running_mean(self, prediction_index, branch_is_taken, address=None):
         
         counter = self.prediction_table[prediction_index]
@@ -662,18 +652,23 @@ class GShare_ML(BranchPredictor):
         prediction = prediction / (self.k-1) > 0.5
         return prediction == branch_is_taken
     
+    def vectorize(self, x):
+        record = {}
+        for i in range(self.n):
+            extracted = (x) & 1
+            x = x >> 1
+            record[i] = extracted
+        return record
+
     def river_prediction(self, prediction_index, branch_is_taken, address=None):
         
         model = self.prediction_table[prediction_index]
-        record = bin(self.branch_history)[2:]
-        record = '0' * (self.n - len(record)) + record
-        record = [int(x) for x in record]
-        
-        if self.normalization:
-            denom = sum(record) ** 0.5 + 1e-6
-            record = {i: x / denom for i,x in enumerate(record)}
-        else:
-            record = {i: x for i,x in enumerate(record)}
+        record = self.vectorize(self.branch_history)
+        # if self.normalization:
+        #     denom = sum(record) ** 0.5 + 1e-6
+        #     record = {i: x / denom for i,x in enumerate(record)}
+        # else:
+        # record = {i: x for i,x in enumerate(record)}
 
         prediction = model.predict_proba_one(record)
         prediction = prediction[True] > prediction[False]
@@ -686,15 +681,8 @@ class GShare_ML(BranchPredictor):
     def river_prediction2(self, prediction_index, branch_is_taken, address=None):
         
         model = self.prediction_table
-        record = bin(self.branch_history)[2:]
-        record = '0' * (self.n - len(record)) + record
-        record = [int(x) for x in record]
+        record = self.vectorize(self.branch_history)
 
-        # record = {i: x for i,x in enumerate(record)}
-        
-        denom = sum(record) ** 0.5 + 1e-6
-        record = {i: x / denom for i,x in enumerate(record)}
-        
         # return addr
         prediction = model.predict_proba_one(record)
         prediction = prediction[True] > prediction[False]
@@ -751,24 +739,24 @@ class GShare_ML(BranchPredictor):
 
         return prediction == branch_is_taken
     
-    def river_prediction5(self, prediction_index, branch_is_taken, address=None):
-        prediction = True
-        model = self.prediction_table
-        record = bin(address)[2:]
-        record = [int(x) for x in record]
-        if self.normalization:
-            denom = sum(record) ** 0.5 + 1e-6
-            record = {i: x / denom for i,x in enumerate(record)}
-        else:
-            record = {i: x for i,x in enumerate(record)}
+    def vectorize2(self, x):
+        record = {}
+        for i in range(self.dim):
+            extracted = (x) & 1
+            x = x >> 1
+            record[i] = extracted
+        return record
 
-        prediction = model.predict_proba_one(record)
-        if True in prediction and False in prediction:
-            prediction = prediction[True] > prediction[False]
-        elif False in prediction:
-            prediction = False
+    def river_prediction5(self, prediction_index, branch_is_taken, address=None):
         
+        model = self.prediction_table
+        record = self.vectorize2(address)
+
+        # return addr
+        prediction = model.predict_proba_one(record)
+        prediction = prediction[True] > prediction[False]
         model.learn_one(record, branch_is_taken)
+
         self.prediction_table = model 
 
         return prediction == branch_is_taken
