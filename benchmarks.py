@@ -6,8 +6,8 @@ from tqdm import tqdm
 
 TRACE_FILES = 'gcc_trace.txt', 'jpeg_trace.txt', 'perl_trace.txt'
 INSTRUCTIONS = [load_instructions(file) for file in TRACE_FILES]
-OUTPUT_FILE = 'benchmarks.csv'
-
+OUTPUT_FILE = 'benchmarks5.csv'
+REPETITIONS = 20
 
 headers = ['Tracefile', 'Predictor', 'Predictor Arguments', 'Misprediction Rate', 'Accuracy', 'Precision', 'Recall', 'F1', 'Runtime', 'TP', 'TN', 'FP', 'FN', 'Size']
 if not os.path.isfile(OUTPUT_FILE):
@@ -52,47 +52,18 @@ def run_benchmark_one_trace_file(trace_file: str, instructions: List[Tuple[int, 
         f.write(data_line)
         f.write('\n')
 
-    return data
-
 
 def run_benchmark(predictor_class, predictor_args: tuple):
-    all_data = []
     for instructions, trace_file in zip(INSTRUCTIONS, TRACE_FILES):
         try:
-            data = run_benchmark_one_trace_file(trace_file, instructions, predictor_class, predictor_args)
+            for _ in range(REPETITIONS):
+                run_benchmark_one_trace_file(trace_file, instructions, predictor_class, predictor_args)
         except Exception as e:
             print()
             print(f"Error running {predictor_class} with arguments {predictor_args} on trace file {trace_file}")
             print(e)
             print()
             continue
-
-        tf, name, args, mpr, acc, prec, rec, f1, runtime, tp, tn, fp, fn, size = data
-        data = [tf, name, args, float(mpr), float(acc), float(prec), float(rec), float(f1), float(runtime), int(tp), int(tn), int(fp), int(fn), size if size == "NA" else int(size)]
-        all_data.append(data)
-
-    if len(all_data) < 2:
-        return
-
-    name, args = all_data[0][1:3]
-    size = all_data[0][-1]
-
-    average_data = []
-    for i in range(3, 13):
-        total = 0
-        for data in all_data:
-            total += data[i]
-        avg = total / len(all_data)
-        average_data.append(avg)
-
-    mpr, acc, prec, rec, f1, runtime, tp, tn, fp, fn = average_data
-    data = ['average', name, args, f"{mpr:.2f}", f"{acc:.4f}", f"{prec:.4f}", f"{rec:.4f}", f"{f1:.4f}", f"{runtime:.2f}", 
-            f"{tp:.2f}", f"{tn:.2f}", f"{fp:.2f}", f"{fn:.2f}", f"{size}"]
-    data_line = ','.join(data)
-
-    with open(OUTPUT_FILE, 'a') as f:
-        f.write(data_line)
-        f.write('\n')
 
 
 if __name__ == "__main__":
@@ -174,14 +145,6 @@ if __name__ == "__main__":
     for args in tqdm(gshare_args, desc="GShare_ML ALMA 2"):
         run_benchmark(GShare_ML, (*args, "ALMA2"))
 
-    ### GShare: GaussianNB ###
-    for args in tqdm(gshare_args, desc="GShare_ML GaussianNB"):
-        run_benchmark(GShare_ML, (*args, "GaussianNB"))
-
-    ### GShare: GaussianNB 2 ###
-    for args in tqdm(gshare_args, desc="GShare_ML GaussianNB 2"):
-        run_benchmark(GShare_ML, (*args, "GaussianNB2"))
-
     ### Hybrid (takes a *very* long time) ###
     hybrid_args = []
     for k in range(11):
@@ -193,3 +156,4 @@ if __name__ == "__main__":
     for args in tqdm(hybrid_args, desc="Hybrid"):
         run_benchmark(Hybrid, args)
     
+# python benchmarks.py
