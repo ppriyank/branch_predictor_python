@@ -7,7 +7,6 @@ from tqdm import tqdm
 TRACE_FILES = 'gcc_trace.txt', 'jpeg_trace.txt', 'perl_trace.txt'
 INSTRUCTIONS = [load_instructions(file) for file in TRACE_FILES]
 OUTPUT_FILE = 'benchmarks5.csv'
-
 no_of_times = 20
 
 headers = ['Tracefile', 'Predictor', 'Predictor Arguments', 'Misprediction Rate', 'Accuracy', 'Precision', 'Recall', 'F1', 'Runtime', 'TP', 'TN', 'FP', 'FN', 'Size']
