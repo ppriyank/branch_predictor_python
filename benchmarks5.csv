@@ -1,3 +1,4 @@
+Tracefile,Predictor,Predictor Arguments,Misprediction Rate,Accuracy,Precision,Recall,F1,Runtime,TP,TN,FP,FN,Size
 gcc_trace.txt,Smith,"1",45.24,0.5476,0.5442,0.5442,0.5442,0.73,540052,555121,452414,452413,1
 gcc_trace.txt,Smith,"1",45.24,0.5476,0.5442,0.5442,0.5442,0.73,540052,555121,452414,452413,1
 gcc_trace.txt,Smith,"1",45.24,0.5476,0.5442,0.5442,0.5442,0.73,540052,555121,452414,452413,1
