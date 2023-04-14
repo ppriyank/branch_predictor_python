@@ -20,7 +20,7 @@ plotting_x = "runtime"
 plotting_size = "accuracy"
 
 OPACITY = 0.80
-THRESHOLD = 0.02
+THRESHOLD = 0.025
 TRACE_FILES = 'gcc_trace.txt', 'jpeg_trace.txt', 'perl_trace.txt'
 REPETITIONS = 20
 baselines = "benchmarks5.csv"
@@ -54,13 +54,27 @@ def compare(x,y):
 def custom_average(series):
     return series[REPETITIONS // 2 :].mean()
     
+def indicator(x):
+    if len(x.split(",")) > 0:
+        x = x.split(",")
+        length = len(x)
+        already = 0
+        for i in range(length):
+            already += int(x[i])
+        return already
+    else:
+        return int(x)
+
 Runtime =  {}     
+Weights = {}
 for trace in TRACE_FILES:
+    Weights[trace] = {}
     Runtime[trace] = {}
     trace_results = results[results["trace_file"] == trace]
     algorithms = trace_results.predictor.unique()
     for algo in algorithms:
         print(f"\n\n {algo} \n\n")
+        Weights[trace][algo] = 1000
         Vals_Y_to_be_plotted = []  
         Vals_X_to_be_plotted = []  
         Runtime[trace][algo] = {}
@@ -71,6 +85,7 @@ for trace in TRACE_FILES:
         print(filtered_df)
         indices = sorted(filtered_df.index, key=functools.cmp_to_key(compare))
         for args in indices:
+            Weights[trace][algo] = min( Weights[trace][algo], indicator(args))
             vals = filtered_df[filtered_df.index == args].to_dict(orient='list')
             curr_y = vals[plotting_y][0]
             curr_x = vals[plotting_x][0]
@@ -84,40 +99,74 @@ for trace in TRACE_FILES:
             Vals_X_to_be_plotted.append(curr_x)
             Runtime[trace][algo][args] = vals
 
+def plotting1():
+    for trace in TRACE_FILES:
+        plt.grid(alpha=0.5)
+        # plt.rcParams['font.size'] = 8
+        legends = []
+        labels = []
+        for i,algo in enumerate(Runtime[trace].keys()):
+            Y = []
+            X = []
+            Z = []
+            labels.append(algo)
+            for args in Runtime[trace][algo].keys():
+                Y.append(Runtime[trace][algo][args][plotting_y][0])
+                X.append(Runtime[trace][algo][args][plotting_x][0])
+                Z.append(
+                    Runtime[trace][algo][args][plotting_size][0]
+                )
+                label = algo + " " + args
+                # plt.annotate(label, xy=(X[-1], Y[-1]), xycoords='data',)
+            Z = np.array(Z)
+            area = np.clip((500 * Z**2), 50, a_max=None)
+            # plt.scatter(X, Y, s=area, c=colors[i], alpha=0.8, label=algo, edgecolors='black')
+            plt.scatter(X, Y, s=area, c=colors[i], alpha=OPACITY, edgecolors='black')
+            # Create dummy Line2D objects for legend
+            h = Line2D([0], [0], marker='o', markersize=np.sqrt(100), color=colors[i], linestyle='None', alpha=OPACITY, markeredgecolor='black')
+            legends.append(h)
+        plt.legend(legends, labels, loc="lower right", markerscale=2, scatterpoints=0, fontsize=20)
+        # plt.rcParams['font.size'] = 30
+        # import pdb
+        # pdb.set_trace()
+        plt.title("BenchMarking: " + r"$\bf{" + str(trace.replace("_", "\_")) + "}$" + f", Thres. skip {THRESHOLD}")
+        # plt.title(f"BenchMarking:{trace}, Threshold for skipping {THRESHOLD}")
+        # plt.legend()
+        plt.xlabel("Runtime (seconds) (Avg of 20 runs)")
+        plt.ylabel(f"{plotting_y} Scores")
+        plt.savefig(f"{trace}.png")
+        plt.clf()  
+        
 
 
-for trace in TRACE_FILES:
-    plt.grid(alpha=0.5)
-    # plt.rcParams['font.size'] = 8
-    legends = []
-    labels = []
-    for i,algo in enumerate(Runtime[trace].keys()):
-        Y = []
-        X = []
-        Z = []
-        labels.append(algo)
-        for args in Runtime[trace][algo].keys():
-            Y.append(Runtime[trace][algo][args][plotting_y][0])
-            X.append(Runtime[trace][algo][args][plotting_x][0])
-            Z.append(
-                Runtime[trace][algo][args][plotting_size][0]
-            )
-            label = algo + " " + args
-            # plt.annotate(label, xy=(X[-1], Y[-1]), xycoords='data',)
-        Z = np.array(Z)
-        area = np.clip((500 * Z**2), 50, a_max=None)
-        # plt.scatter(X, Y, s=area, c=colors[i], alpha=0.8, label=algo, edgecolors='black')
-        plt.scatter(X, Y, s=area, c=colors[i], alpha=OPACITY, edgecolors='black')
-        # Create dummy Line2D objects for legend
-        h = Line2D([0], [0], marker='o', markersize=np.sqrt(100), color=colors[i], linestyle='None', alpha=OPACITY, markeredgecolor='black')
-        legends.append(h)
-    plt.legend(legends, labels, loc="lower right", markerscale=2, scatterpoints=0, fontsize=20)
-    # plt.rcParams['font.size'] = 30
-    plt.title(f"BenchMarking:{trace}, Threshold for skipping {THRESHOLD}")
-    # plt.legend()
-    plt.xlabel("Runtime (seconds) (Avg of 20 runs)")
-    plt.ylabel(f"{plotting_y} Scores")
-    plt.savefig(f"{trace}.png")
-    plt.clf()  
-    
+def plotting2():
+    for trace in TRACE_FILES:
+        plt.grid(alpha=0.5)
+        # plt.rcParams['font.size'] = 8
+        legends = []
+        labels = []
+        for i,algo in enumerate(Runtime[trace].keys()):
+            Y = []
+            X = []
+            Z = []
+            labels.append(algo)
+            for args in Runtime[trace][algo].keys():
+                Y = Runtime[trace][algo][args][plotting_y][0]
+                X = Runtime[trace][algo][args][plotting_x][0]
+                Z = Runtime[trace][algo][args][plotting_size][0]
+                opacity = indicator(args)
+                label = algo + " " + args
+                area = max((500 * Z**2), 50)
+                plt.scatter(X, Y, s=area, c=colors[i], alpha=min(Weights[trace][algo] / opacity, 1), edgecolors='black')    
+            h = Line2D([0], [0], marker='o', markersize=np.sqrt(100), color=colors[i], linestyle='None', alpha=OPACITY, markeredgecolor='black')
+            legends.append(h)
+        plt.legend(legends, labels, loc="lower right", markerscale=2, scatterpoints=0, fontsize=20)
+        plt.title("BenchMarking: " + r"$\bf{" + str(trace.replace("_", "\_")) + "}$" + f", Thres. skip {THRESHOLD}")
+        plt.xlabel("Runtime (seconds) (Avg of 20 runs)")
+        plt.ylabel(f"{plotting_y} Scores")
+        plt.savefig(f"{trace}.png")
+        plt.clf()  
+        
 
+
+plotting2()
