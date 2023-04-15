@@ -430,23 +430,23 @@ class PShare:
         prediction = self.prediction_table[self.local_history_table[address & ((1 << self.n) - 1)]][index]
         pshare_prediction = self.pshare_table[address & self.pshare_mask]
         prediction = max(prediction - 1, 0) if pshare_prediction == "NT" else min(prediction + 1, 3)
-        self.update_counters(index, outcome)
+        outcome_int = 1 if outcome == "T" else 0
+        self.update_counters(address, outcome_int)
         return prediction
     
-    def update_counters(self, index, outcome):
-        if index >= len(self.local_history_table):
-            return
-        outcome = bin(self.local_history_table[index]).count('1') >= self.n//2
-        self.prediction_table[self.local_history_table[index]][index] = min(self.prediction_table[self.local_history_table[index]][index] + 1, 3)
-        self.local_history_table[index] = ((self.local_history_table[index] << 1) | int(outcome)) & ((1 << self.n) - 1)
-        self.local_history_table[index] &= (1 << self.n) - 1
+    def update_counters(self, address, branch_is_taken):
+        index = address % self.table_size
+        local_history = self.local_history_table[address & ((1 << self.n) - 1)]
+        outcome = bin(local_history).count('1') >= self.n//2
+        self.prediction_table[local_history][index] = min(self.prediction_table[local_history][index] + 1, 3) if branch_is_taken else max(self.prediction_table[local_history][index] - 1, 0)
+        self.local_history_table[address & ((1 << self.n) - 1)] = ((local_history << 1) | int(branch_is_taken)) & ((1 << self.n) - 1)
 
     def make_prediction(self, address, branch_is_taken):
         index = address % self.table_size
         prediction = self.prediction_table[self.local_history_table[address & ((1 << self.n) - 1)]][index]
         pshare_prediction = self.pshare_table[address & self.pshare_mask]
         prediction = max(prediction - 1, 0) if pshare_prediction == "NT" else min(prediction + 1, 3)
-        self.update_counters(index, 1 if branch_is_taken else 0)
+        self.update_counters(address, branch_is_taken)
         return prediction >= 2
 
 class Tournament:
