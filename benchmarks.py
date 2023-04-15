@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 TRACE_FILES = 'gcc_trace.txt', 'jpeg_trace.txt', 'perl_trace.txt'
 INSTRUCTIONS = [load_instructions(file) for file in TRACE_FILES]
-OUTPUT_FILE = 'benchmarks7.csv'
+OUTPUT_FILE = 'benchmarks11.csv'
 REPETITIONS = 20
 
 headers = ['Tracefile', 'Predictor', 'Predictor Arguments', 'Misprediction Rate', 'Accuracy', 'Precision', 'Recall', 'F1', 'Runtime', 'TP', 'TN', 'FP', 'FN', 'Size']
@@ -15,8 +15,7 @@ headers = ['Tracefile', 'Predictor', 'Predictor Arguments', 'Misprediction Rate'
 default_algorithms =["Smith", "Bimodal", "TAGE", "YehPatt", "GShare", "Hybrid"]
 eddy = ["PShare", "Tournament"]
 simple_ml = ["running_mean", "running_mean2", "nearest_neighbour", "nearest_neighbour2"]
-running_ml = ["logistic", "skmean2", "skmean", "nearest_neighbour3"]
-not_sure = ["ALMA", "Perceptron"]
+running_ml = ["perceptron", "logistic", "skmean2", "skmean", "nearest_neighbour3"]
 
 if not os.path.isfile(OUTPUT_FILE):
     header_line = ','.join(headers)
@@ -74,7 +73,7 @@ def run_benchmark(predictor_class, predictor_args: tuple):
             continue
 
 # to_run = default_algorithms + eddy + simple_ml + clustering_ml
-to_run = eddy[-1]
+to_run = [eddy[0]] + running_ml + [default_algorithms[-1]]
 
 if __name__ == "__main__":
     if "Smith" in to_run:
@@ -173,7 +172,7 @@ if __name__ == "__main__":
     
     if "perceptron" in to_run:
         for counter_bits in tqdm(range(1, 20,2), desc="Nearest Pattern 3"):
-            run_benchmark(Running_logistic, (counter_bits, 0.9, 0.1))
+            run_benchmark(Running_Perceptron, (counter_bits))
 
     # ### GShare: logistic ###
     # for args in tqdm(gshare_args, desc="GShare_ML Logistic"):
