@@ -986,6 +986,39 @@ class Running_Perceptron(Running_logistic):
                 self.weight[i] += self.record[i] * label
         return prediction == branch_is_taken
             
+class GShare_Perceptron(Running_logistic):
+    def __init__(self, m: int, n: int) -> None:
+
+        self.branch_history = 0
+        self.dim = n
+        self.nth_bit_from_the_right = 1 << (n-1)
+        self.weight = [[0 for _ in range(n)] for i in range(2 ** m)]
+        self.record = [0 for _ in range(n)]
+
+        self.rightmost_m_bits = 2 ** m - 1
+
+    def get_prediction_index(self, address: int) -> int:
+        return (address & self.rightmost_m_bits) ^ self.branch_history   
+
+    def make_model_prediction(self, branch_is_taken, address=None):    
+        prediction_index = self.get_prediction_index(address)
+        weights = self.weight[prediction_index]
+
+        x = self.branch_history
+        label = 2 * int(branch_is_taken) -1 
+
+        pred = 0 
+        for i in range(self.dim):
+            self.record[i] = (x) & 1
+            x = x >> 1
+            pred += self.record[i] * weights[i]
+            
+        prediction = pred >= 0 
+        if pred * label <= 0:
+            for i in range(self.dim):
+                self.weight[prediction_index][i] += self.record[i] * label
+        return prediction == branch_is_taken
+            
     
     
 
