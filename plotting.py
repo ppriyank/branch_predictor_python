@@ -15,25 +15,34 @@ plt.rcParams["legend.labelcolor"] = "black"
 plt.rcParams["legend.edgecolor"] = "black"
 plt.figure(figsize=(20, 20))
 
-plotting_y = "f1"
-plotting_x = "runtime"
-plotting_size = "accuracy"
+plotting_y = "F1"
+plotting_x = "Runtime"
+plotting_size = "Accuracy"
 
-OPACITY = 0.80
-THRESHOLD = 0.025
+OPACITY = 0.90
+THRESHOLD = 0.04
 TRACE_FILES = 'gcc_trace.txt', 'jpeg_trace.txt', 'perl_trace.txt'
 REPETITIONS = 20
-baselines = "benchmarks5.csv"
-columns=["trace_file", "predictor", "args_string", "misprediction_rate", "accuracy",
-"precision", "recall", "f1", "runtime", "true_positive", 
-"true_negative", "false_positive", "false_negative", 'Size']
+baselines = ["benchmarks5.csv", "benchmarks6.csv"]
+# baselines = ["benchmarks6.csv"]
 
-colors = ["blue", "green", "orange", "red", "purple", "cyan", "lime", "violet", 
-    "gold", "peru", "orangered", "yellow", "dodgerblue", "black", "navy", 
-    "deeppink", "fuchsia", "aqua", "teal", "crimson"]
+Ignored_algorithms = ["GShare_ML-running_mean", "GShare_ML-nearest_pattern2","GShare_ML-logistic2" ]
+columns=["Tracefile", "Predictor", "Predictor Arguments", "Misprediction Rate", "Accuracy",
+"Precision", "Recall", "F1", "Runtime", "TP", 
+"TN", "FP", "FN", 'Size']
 
-metrics = ["accuracy", "misprediction_rate", 'f1', 'runtime', "args_string"]
-results = pd.read_csv(baselines, header=None, names=columns)
+colors = ["blue", "green", "orange", "red", "purple", 
+    "yellow", 
+    "navy", "cyan", "lime", "crimson", "violet", 
+    "gold", "deeppink", "peru", "orangered", "teal", "dodgerblue", "black", 
+    "fuchsia", "aqua", ]
+
+metrics = ["Accuracy", "Misprediction Rate", 'F1', 'Runtime', "Predictor Arguments"]
+results = pd.read_csv(baselines[0])
+# results = pd.read_csv(baselines[0], header=None, names=columns)
+for file in baselines[1:]:
+    df = pd.read_csv(file)
+    results = pd.concat([results, df], ignore_index=True)    
 
 def compare(x,y):
     if len(x.split(",")) > 0:
@@ -52,7 +61,7 @@ def compare(x,y):
         return int(x) - int(y) 
 
 def custom_average(series):
-    return series[REPETITIONS // 2 :].mean()
+    return series[REPETITIONS // 2 :].astype(float).mean()
     
 def indicator(x):
     if len(x.split(",")) > 0:
@@ -65,24 +74,38 @@ def indicator(x):
     else:
         return int(x)
 
+def handle_ml(x):
+    # print(x["Predictor Arguments"].split(","), )
+    if len(x["Predictor Arguments"].split(",")) == 3:
+        x['Predictor'] += "-" + x["Predictor Arguments"].split(",")[-1].strip()
+        x["Predictor Arguments"] = ",".join(x["Predictor Arguments"].split(",")[:-1])
+        return x
+    else:
+        return x
+
+results = results.apply(handle_ml, axis=1)
 Runtime =  {}     
 Weights = {}
 for trace in TRACE_FILES:
     Weights[trace] = {}
     Runtime[trace] = {}
-    trace_results = results[results["trace_file"] == trace]
-    algorithms = trace_results.predictor.unique()
+    trace_results = results[results["Tracefile"] == trace]
+    algorithms = trace_results.Predictor.unique()
     for algo in algorithms:
+        if algo in Ignored_algorithms:
+            continue 
         print(f"\n\n {algo} \n\n")
         Weights[trace][algo] = 1000
         Vals_Y_to_be_plotted = []  
         Vals_X_to_be_plotted = []  
         Runtime[trace][algo] = {}
-        algorithms_trace = trace_results[trace_results.predictor == algo]
-        assert (algorithms_trace.groupby(['args_string']).count().false_negative == REPETITIONS).all()
+        algorithms_trace = trace_results[trace_results.Predictor == algo]
+        if algo != "PShare":
+            assert (algorithms_trace.groupby(['Predictor Arguments']).count().FN == REPETITIONS).all()
         # filtered_df = algorithms_trace[metrics].groupby(['args_string']).mean()
-        filtered_df = algorithms_trace[metrics].groupby(['args_string']).agg(custom_average)
+        filtered_df = algorithms_trace[metrics].groupby(['Predictor Arguments']).agg(custom_average)
         print(filtered_df)
+        
         indices = sorted(filtered_df.index, key=functools.cmp_to_key(compare))
         for args in indices:
             Weights[trace][algo] = min( Weights[trace][algo], indicator(args))
@@ -154,10 +177,11 @@ def plotting2():
                 Y = Runtime[trace][algo][args][plotting_y][0]
                 X = Runtime[trace][algo][args][plotting_x][0]
                 Z = Runtime[trace][algo][args][plotting_size][0]
-                opacity = indicator(args)
+                # opacity = indicator(args)
                 label = algo + " " + args
-                area = max((500 * Z**2), 50)
-                plt.scatter(X, Y, s=area, c=colors[i], alpha=min(Weights[trace][algo] / opacity, 1), edgecolors='black')    
+                area = max((500 * Z**2), 100)
+                # plt.scatter(X, Y, s=area, c=colors[i], alpha=min(Weights[trace][algo] / opacity, 1), edgecolors='black')    
+                plt.scatter(X, Y, s=area, c=colors[i], alpha=OPACITY, edgecolors='black')    
             h = Line2D([0], [0], marker='o', markersize=np.sqrt(100), color=colors[i], linestyle='None', alpha=OPACITY, markeredgecolor='black')
             legends.append(h)
         plt.legend(legends, labels, loc="lower right", markerscale=2, scatterpoints=0, fontsize=20)
@@ -170,3 +194,6 @@ def plotting2():
 
 
 plotting2()
+
+# conda activate bert
+# python plotting.py
