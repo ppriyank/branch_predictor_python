@@ -482,7 +482,8 @@ class Tournament:
 class GShare_ML(GShare):
     def __init__(self, m: int, n: int, method="running_mean", normalization=True) -> None:
         super().__init__(m, n)
-
+        # pip install river 
+        # pip install numpy==1.20.3
         from river import (
             compose, linear_model, metrics, preprocessing, forest, 
             ensemble, model_selection, tree, naive_bayes, neighbors, utils)
@@ -652,9 +653,9 @@ class GShare_ML(GShare):
         return record
 
     def river_prediction(self, prediction_index, branch_is_taken, address=None):
-        
         model = self.prediction_table[prediction_index]
         record = self.vectorize(self.branch_history)
+        # print(record)
         # if self.normalization:
         #     denom = sum(record) ** 0.5 + 1e-6
         #     record = {i: x / denom for i,x in enumerate(record)}
@@ -763,80 +764,119 @@ class GShare_ML(GShare):
     def size(self) -> Optional[int]:
         return None
 
-class Stream_Clustering():
-    def __init__(self, m: int, n: int, method="skmean2") -> None:        
-        
+
+
+class S_Clustering(BranchPredictor):
+    def __init__(self, m: int, n: int, method=None) -> None:
         self.branch_history = 0
         self.n = n
-        self.nth_bit_from_the_right = 1 << (n-1)
-        self.m = m 
-        self.alpha = 0.25
-        
+        if n!=-1:
+            self.nth_bit_from_the_right = 1 << (n-1)
+
+        self.m = 2 ** m 
+        self.alpha = 0.5
         self.intial_cluster=  0 
-        self.labels = [{False: 0, True: 0} for i in range(m)]
+        # self.counter = [0 for e in range (m)]
         if method == "skmean2":
-            dim = 22
-            self.prediction_table = np.array([  [0 for i in range(dim)] for e in range (m) ])
-            self.make_model_prediction = self.skmeans2            
+            self.dim = 22
+            self.make_model_prediction = self.skmeans3
+            self.update_history = self.update_history2
+            del self.n, self.branch_history
         else:
-            self.prediction_table = np.array([  [0 for i in range(self.n)] for e in range (m) ])
+            self.dim = self.n
             self.make_model_prediction = self.skmeans            
+
+        self.prediction_table = np.array([  [0.0 for i in range(self.dim)] for e in range (self.m) ], dtype=np.float16)
         
+        counter_bits = 2
+        self.counter_bits = counter_bits
+        self.counter_max = 2 ** counter_bits - 1
+        self.threshold = 2 ** (counter_bits - 1)
+        self.labels = [self.threshold for _ in range(self.m)]
+
     def update_history(self, branch_is_taken: bool) -> None:
         self.branch_history >>= 1
         if branch_is_taken:
             self.branch_history |= self.nth_bit_from_the_right
 
+    def update_history2(self, branch_is_taken: bool) -> None:
+        return 
+        
     def skmeans(self, branch_is_taken, address=None):
-        addr = bin(self.branch_history)[2:]
-        addr = np.array([0] * (self.n - len(addr)) + [int(e) for e in addr])
+        record = self.vectorize_dim(self.branch_history)
+        distances = abs(record - self.prediction_table).sum(1)
+        assigned_cluster = distances.argmin()
+
+        counter = self.labels[assigned_cluster]
+        prediction = counter >= self.threshold
+
+        if branch_is_taken and counter < self.counter_max:
+            counter += 1
+        elif not branch_is_taken and counter > 0:
+            counter -= 1
+        self.labels[assigned_cluster] = counter
         
-        if self.intial_cluster < self.m :
-            assigned_cluster = self.intial_cluster
-            self.intial_cluster += 1
-        else:
-            distances = np.linalg.norm(addr - self.prediction_table, ord=1, axis=1.)
-            assigned_cluster = np.argmin(distances)
-        
-        stats = self.labels[assigned_cluster]
-        prediction = stats[True] >= stats[False] 
-        
-        temp_center = self.prediction_table[assigned_cluster]
-        temp_center = temp_center + self.alpha * (address - temp_center)
-        
-        self.prediction_table[assigned_cluster] = temp_center
-        self.labels[assigned_cluster][branch_is_taken] += 1
-        
+        self.prediction_table[assigned_cluster] += self.alpha * (record - self.prediction_table[assigned_cluster])        
+        # self.counter[assigned_cluster] += 1
+
         return prediction == branch_is_taken
     
     def skmeans2(self, branch_is_taken, address=None):
-        
-        addr = bin(address)[2:]
-        addr = np.array([int(e) for e in addr])
-        
-        if self.intial_cluster < self.m :
-            assigned_cluster = self.intial_cluster
-            self.intial_cluster += 1
-        else:
-            distances = np.linalg.norm(addr - self.prediction_table, ord=1, axis=1.)
-            assigned_cluster = np.argmin(distances)
+        record = self.vectorize_dim(address)
+
+        distances = abs(record - self.prediction_table).sum(1)
+        assigned_cluster = distances.argmin()
         
         stats = self.labels[assigned_cluster]
         prediction = stats[True] >= stats[False] 
-        
-        temp_center = self.prediction_table[assigned_cluster]
-        temp_center = temp_center + self.alpha * (address - temp_center)
-        
-        self.prediction_table[assigned_cluster] = temp_center
+        self.prediction_table[assigned_cluster] = self.prediction_table[assigned_cluster] + self.alpha * (record - self.prediction_table[assigned_cluster])
         self.labels[assigned_cluster][branch_is_taken] += 1
         
         return prediction == branch_is_taken
     
+    def skmeans3(self, branch_is_taken, address=None):
+        record = self.vectorize_dim(address)
+        distances = abs(record - self.prediction_table).sum(1)
+        assigned_cluster = distances.argmin()
+        
+        counter = self.labels[assigned_cluster]
+        prediction = counter >= self.threshold
+
+        if branch_is_taken and counter < self.counter_max:
+            counter += 1
+        elif not branch_is_taken and counter > 0:
+            counter -= 1
+        self.labels[assigned_cluster] = counter
+        self.prediction_table[assigned_cluster] += self.alpha * (record - self.prediction_table[assigned_cluster])        
+        # self.counter[assigned_cluster] += 1
+
+        return prediction == branch_is_taken
+    
+    def vectorize(self, x):
+        record = {}
+        for i in range(self.n):
+            extracted = (x) & 1
+            x = x >> 1
+            record[i] = extracted
+        return record
+    
+    def vectorize_dim(self, x):
+        record = [0 for i in range(self.dim) ]
+        for i in range(self.dim):
+            extracted = (x) & 1
+            x = x >> 1
+            record[i] = extracted
+        record = np.array(record)
+        return record
+ 
     def make_prediction(self, address: int, branch_is_taken: bool) -> bool:
         prediction_is_correct = self.make_model_prediction(branch_is_taken, address)
-
         self.update_history(branch_is_taken)
         return prediction_is_correct
+        
+        
+    
+    
 
 
 def load_instructions(filename: str) -> List[Tuple[int, bool]]:

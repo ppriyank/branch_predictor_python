@@ -1,5 +1,5 @@
 import sys
-from branch_predictor import Stream_Clustering, run_predictor
+from branch_predictor import GShare_ML2, run_predictor
 from time import perf_counter
 
 m = int(sys.argv[1])
@@ -7,7 +7,7 @@ n = int(sys.argv[2])
 method = sys.argv[3]
 trace_file = sys.argv[4]
 
-predictor = Stream_Clustering(m, n, method)
+predictor = S_Clustering(m, n, method)
 start = perf_counter()
 num_predictions, num_mispredictions, detailed_output = run_predictor(predictor, trace_file, return_detailed_output=True)
 runtime = perf_counter() - start
@@ -30,19 +30,17 @@ data_line = {"misprediction_rate": f"{misprediction_rate:.2f}" ,
 for key in data_line:
     print(f"{key:<15}:		{data_line[key]:>10}")
 
-print(predictor.labels)
+# print(predictor.labels)
+print(predictor.counter)
+
 
 # print(f"number of predictions:		{num_predictions}")
 # print(f"number of mispredictions:	{num_mispredictions}")
 # print(f"misprediction rate:		{misprediction_rate:.2f}%")
-# print("FINAL GSHARE CONTENTS")
-# for i, counter in enumerate(predictor.prediction_table):
-#     print(f"{i:<2} {counter}")
 
-#     # This is just here so that the output doesn't flood the console
-#     if i > 9:
-#         break
-
-
-# python s_clustering.py 5 16 "skmean2" traces/jpeg_trace.txt
+# srun --pty -t30:00:00 --cpus-per-task=12 bash    
+# conda activate pathak3
+# cd ~/branch_predictor_python
+# python s_clustering.py 5 -1 "skmean2" traces/jpeg_trace.txt
 # python s_clustering.py 5 20 "skmean" traces/jpeg_trace.txt
+
