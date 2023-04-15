@@ -764,8 +764,6 @@ class GShare_ML(GShare):
     def size(self) -> Optional[int]:
         return None
 
-
-
 class S_Clustering(BranchPredictor):
     def __init__(self, m: int, n: int, method=None) -> None:
         self.branch_history = 0
@@ -869,6 +867,58 @@ class S_Clustering(BranchPredictor):
         record = np.array(record)
         return record
  
+    def make_prediction(self, address: int, branch_is_taken: bool) -> bool:
+        prediction_is_correct = self.make_model_prediction(branch_is_taken, address)
+        self.update_history(branch_is_taken)
+        return prediction_is_correct
+        
+class NN_Clustering(BranchPredictor):
+    def __init__(self, n: int) -> None:
+        self.branch_history = 0
+        self.n = n
+        self.nth_bit_from_the_right = 1 << (n-1)
+
+        # counter_bits = 3
+        # self.counter_bits = counter_bits
+        # self.counter_max = 2 ** counter_bits - 1
+        # self.threshold = 2 ** (counter_bits - 1)
+
+        self.sol = {}
+        for pairs in range(2, n+1):
+            for k in range(pairs+1):
+                poss = ["1" for i in range(k)] + ["0" for i in range(pairs - k)]
+                self.heapPermutation(poss , pairs)
+
+    def update_history(self, branch_is_taken: bool) -> None:
+        self.branch_history >>= 1
+        if branch_is_taken:
+            self.branch_history |= self.nth_bit_from_the_right
+
+    def heapPermutation(self, a, size):
+        if size == 1:
+            self.sol["".join(a)] = 0
+            return a
+        for i in range(size):
+            self.heapPermutation(a, size-1)
+            if size & 1:
+                a[0], a[size-1] = a[size-1], a[0]
+            else:
+                a[i], a[size-1] = a[size-1], a[i]
+
+    def make_model_prediction(self, branch_is_taken, address=None):    
+        prediction = 0 
+        so_far = ""
+        for e in range(self.n,1,-1): 
+            extracted = (((self.branch_history) & (1 << (e - 1))) >> (e - 1))
+            so_far  += str(extracted)
+            pred = self.sol[so_far + '1']  >= self.sol[so_far + '0'] 
+            prediction += int(pred)
+            self.sol[so_far + str(int(branch_is_taken))] += 1
+            self.sol[so_far + str(1-int(branch_is_taken))] -= 1
+            
+        prediction = (prediction / (self.n-1)) > 0.5
+        return prediction == branch_is_taken
+        
     def make_prediction(self, address: int, branch_is_taken: bool) -> bool:
         prediction_is_correct = self.make_model_prediction(branch_is_taken, address)
         self.update_history(branch_is_taken)

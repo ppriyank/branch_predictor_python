@@ -6,7 +6,7 @@ from tqdm import tqdm
 
 TRACE_FILES = 'gcc_trace.txt', 'jpeg_trace.txt', 'perl_trace.txt'
 INSTRUCTIONS = [load_instructions(file) for file in TRACE_FILES]
-OUTPUT_FILE = 'benchmarks10.csv'
+OUTPUT_FILE = 'benchmarks7.csv'
 REPETITIONS = 20
 
 headers = ['Tracefile', 'Predictor', 'Predictor Arguments', 'Misprediction Rate', 'Accuracy', 'Precision', 'Recall', 'F1', 'Runtime', 'TP', 'TN', 'FP', 'FN', 'Size']
@@ -15,6 +15,8 @@ default_algorithms =["Smith", "Bimodal", "TAGE", "YehPatt", "GShare", "Hybrid"]
 eddy = ["PShare", "Tournament"]
 simple_ml = ["running_mean", "running_mean2", "nearest_neighbour", "nearest_neighbour2"]
 clustering_ml = ["skmean2", "skmean"]
+not_sure = ["ALMA", "Perceptron"]
+
 if not os.path.isfile(OUTPUT_FILE):
     header_line = ','.join(headers)
     with open(OUTPUT_FILE, 'w') as f:
@@ -70,8 +72,8 @@ def run_benchmark(predictor_class, predictor_args: tuple):
             print()
             continue
 
-# to_run = default_algorithms + eddy + simple_ml
-to_run = clustering_ml
+# to_run = default_algorithms + eddy + simple_ml + clustering_ml
+to_run = eddy[-1]
 
 if __name__ == "__main__":
     if "Smith" in to_run:
@@ -118,6 +120,18 @@ if __name__ == "__main__":
         for args in tqdm(gshare_args, desc="Tournament"):
             run_benchmark(Tournament, args)
     
+    if "Hybrid" in to_run:
+        ## Hybrid (takes a *very* long time) ###
+        hybrid_args = []
+        for k in range(11):
+            for m_gshare in range(2, 17, 4):
+                for n in range(2, m_gshare + 1, 4):
+                    for m_bimodal in range(2, 17, 4):
+                        hybrid_args.append((k, m_gshare, n, m_bimodal))
+
+        for args in tqdm(hybrid_args, desc="Hybrid"):
+            run_benchmark(Hybrid, args)
+    
     if "running_mean" in to_run:
         ## GShare: running_mean ###
         for args in tqdm(gshare_args, desc="GShare_ML Running Mean"):
@@ -127,16 +141,6 @@ if __name__ == "__main__":
         ### GShare: running_mean 2 ###
         for args in tqdm(gshare_args, desc="GShare_ML Running Mean 2"):
             run_benchmark(GShare_ML, (*args, "running_mean2"))
-
-    if "skmean2" in to_run:
-        ### ML Clustering ###
-        for counter_bits in tqdm(range(1, 10), desc="SClustering"):
-            run_benchmark(S_Clustering, (counter_bits, -1, "skmean2"))
-
-    if "skmean" in to_run:
-        for counter_bits in tqdm(range(1, 10), desc="SClustering"):
-            for m in range(2, 21, 2):
-                run_benchmark(S_Clustering, (counter_bits, m, "skmean"))
 
     if "nearest_neighbour" in to_run:
         ### GShare: nearest_pattern ###
@@ -148,6 +152,20 @@ if __name__ == "__main__":
         for args in tqdm(gshare_args, desc="GShare_ML Nearest Pattern 2"):
             run_benchmark(GShare_ML, (*args, "nearest_pattern2"))
     
+    if "skmean2" in to_run:
+        ### ML Clustering ###
+        for counter_bits in tqdm(range(1, 10), desc="SClustering"):
+            run_benchmark(S_Clustering, (counter_bits, -1, "skmean2"))
+
+    if "skmean" in to_run:
+        for counter_bits in tqdm(range(1, 10), desc="SClustering"):
+            for m in range(2, 21, 2):
+                run_benchmark(S_Clustering, (counter_bits, m, "skmean"))
+
+    if "nearest_neighbour3" in to_run:
+        for counter_bits in tqdm(range(1, 7), desc="Nearest Pattern 3"):
+            run_benchmark(NN_Clustering, (counter_bits))
+
     # ### GShare: logistic ###
     # for args in tqdm(gshare_args, desc="GShare_ML Logistic"):
     #     run_benchmark(GShare_ML, (*args, "logistic"))
@@ -172,16 +190,5 @@ if __name__ == "__main__":
     # for args in tqdm(gshare_args, desc="GShare_ML ALMA 2"):
     #     run_benchmark(GShare_ML, (*args, "ALMA2"))
     
-    if "Hybrid" in to_run:
-        ## Hybrid (takes a *very* long time) ###
-        hybrid_args = []
-        for k in range(11):
-            for m_gshare in range(2, 17, 4):
-                for n in range(2, m_gshare + 1, 4):
-                    for m_bimodal in range(2, 17, 4):
-                        hybrid_args.append((k, m_gshare, n, m_bimodal))
-
-        for args in tqdm(hybrid_args, desc="Hybrid"):
-            run_benchmark(Hybrid, args)
     
 # python benchmarks.py
