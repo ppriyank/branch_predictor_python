@@ -36,4 +36,3 @@ python gshare.py 11 5 traces/jpeg_trace.txt
 ### ToDO    
     - Wrong Pendalty = -2
     - Correct Reward = 1
-    - Test on ucf2: torunament, pshare, sclustering, 
