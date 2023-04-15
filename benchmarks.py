@@ -1,7 +1,7 @@
 from time import perf_counter
 import os
 from typing import List, Tuple
-from branch_predictor import Smith, Bimodal, GShare, Hybrid, YehPatt, Tage, GShare_ML, PShare, Tournament, run_predictor, load_instructions, S_Clustering
+from branch_predictor import Smith, Bimodal, GShare, Hybrid, YehPatt, Tage, GShare_ML, PShare, Tournament, run_predictor, load_instructions, S_Clustering, Running_logistic
 from tqdm import tqdm
 
 TRACE_FILES = 'gcc_trace.txt', 'jpeg_trace.txt', 'perl_trace.txt'
@@ -15,7 +15,7 @@ default_algorithms =["Smith", "Bimodal", "TAGE", "YehPatt", "GShare", "Hybrid"]
 eddy = ["PShare", "Tournament"]
 simple_ml = ["running_mean", "running_mean2", "nearest_neighbour", "nearest_neighbour2"]
 clustering_ml = ["skmean2", "skmean"]
-not_sure = ["ALMA", "Perceptron"]
+not_sure = ["ALMA", "Perceptron", "logistic"]
 
 if not os.path.isfile(OUTPUT_FILE):
     header_line = ','.join(headers)
@@ -165,6 +165,10 @@ if __name__ == "__main__":
     if "nearest_neighbour3" in to_run:
         for counter_bits in tqdm(range(1, 7), desc="Nearest Pattern 3"):
             run_benchmark(NN_Clustering, (counter_bits))
+    
+    if "logistic" in to_run:
+        for counter_bits in tqdm(range(1, 20), desc="Nearest Pattern 3"):
+            run_benchmark(Running_logistic, (counter_bits, 0.9, 0.1))
 
     # ### GShare: logistic ###
     # for args in tqdm(gshare_args, desc="GShare_ML Logistic"):

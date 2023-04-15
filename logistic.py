@@ -1,11 +1,13 @@
 import sys
-from branch_predictor import NN_Clustering, run_predictor
+from branch_predictor import Running_logistic, run_predictor
 from time import perf_counter
 
 n = int(sys.argv[1])
-trace_file = sys.argv[2]
+alpha = float(sys.argv[2])
+gamma = float(sys.argv[3])
+trace_file = sys.argv[4]
 
-predictor = NN_Clustering(n)
+predictor = Running_logistic(n, alpha, gamma)
 start = perf_counter()
 num_predictions, num_mispredictions, detailed_output = run_predictor(predictor, trace_file, return_detailed_output=True)
 runtime = perf_counter() - start
@@ -29,9 +31,8 @@ for key in data_line:
     print(f"{key:<15}:		{data_line[key]:>10}")
 
 
-# srun --pty -t30:00:00 --cpus-per-task=12 bash    
-# conda activate pathak3
-# cd ~/branch_predictor_python
-# python NN.py 5 traces/jpeg_trace.txt
+# python logistic.py 5 0.1 traces/jpeg_trace.txt
+# python logistic.py 5 0.9 traces/jpeg_trace.txt   
+# python logistic.py 5 0.8 traces/jpeg_trace.txt 
 
-
+# python logistic.py 10 0.9 0.1 traces/jpeg_trace.txt 

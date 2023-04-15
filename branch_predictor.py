@@ -5,7 +5,7 @@ from itertools import cycle
 from typing import List, Tuple, Optional
 from abc import abstractmethod
 import numpy as np
-
+from math import e
 
 class BranchPredictor:
     """
@@ -919,6 +919,49 @@ class NN_Clustering(BranchPredictor):
         prediction = (prediction / (self.n-1)) > 0.5
         return prediction == branch_is_taken
         
+    def make_prediction(self, address: int, branch_is_taken: bool) -> bool:
+        prediction_is_correct = self.make_model_prediction(branch_is_taken, address)
+        self.update_history(branch_is_taken)
+        return prediction_is_correct
+        
+class Running_logistic(BranchPredictor):
+    # https://a3nm.net/work/seminar/slides/20210610-bonald.pdf
+    def __init__(self, n: int, alpha=0.9, gamma=0.1) -> None:
+        self.branch_history = 0
+        self.dim = self.n = n
+        self.nth_bit_from_the_right = 1 << (n-1)
+        self.weight = np.zeros(self.n)
+        self.S = 0 
+        self.alpha = alpha
+        self.gamma = gamma
+
+    def update_history(self, branch_is_taken: bool) -> None:
+        self.branch_history >>= 1
+        if branch_is_taken:
+            self.branch_history |= self.nth_bit_from_the_right
+
+    def make_model_prediction(self, branch_is_taken, address=None):    
+        record = self.vectorize_dim(self.branch_history)
+        power = - np.dot(self.weight ,record)
+        
+        prob = 1/(1 + e ** power)
+        # prob = 1/(1 + np.exp(power))
+        
+        prediction = prob >= 0.5 
+        self.S = self.S + record * (prob - int(branch_is_taken))
+        self.weight = (1 - self.alpha *  self.gamma ) * self.weight - self.gamma * self.S
+
+        return prediction == branch_is_taken
+
+    def vectorize_dim(self, x):
+        record = [0 for i in range(self.dim) ]
+        for i in range(self.dim):
+            extracted = (x) & 1
+            x = x >> 1
+            record[i] = extracted
+        record = np.array(record)
+        return record
+
     def make_prediction(self, address: int, branch_is_taken: bool) -> bool:
         prediction_is_correct = self.make_model_prediction(branch_is_taken, address)
         self.update_history(branch_is_taken)
