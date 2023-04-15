@@ -928,10 +928,11 @@ class Running_logistic(BranchPredictor):
     # https://a3nm.net/work/seminar/slides/20210610-bonald.pdf
     def __init__(self, n: int, alpha=0.9, gamma=0.1) -> None:
         self.branch_history = 0
-        self.dim = self.n = n
+        self.dim = n
         self.nth_bit_from_the_right = 1 << (n-1)
-        self.weight = np.zeros(self.n)
-        self.S = 0 
+        self.weight = [0 for _ in range(n)]
+        self.S  = [0 for _ in range(n)]
+        self.record = [0 for _ in range(n)]
         self.alpha = alpha
         self.gamma = gamma
 
@@ -941,33 +942,50 @@ class Running_logistic(BranchPredictor):
             self.branch_history |= self.nth_bit_from_the_right
 
     def make_model_prediction(self, branch_is_taken, address=None):    
-        record = self.vectorize_dim(self.branch_history)
-        power = - np.dot(self.weight ,record)
-        
-        prob = 1/(1 + e ** power)
-        # prob = 1/(1 + np.exp(power))
-        
-        prediction = prob >= 0.5 
-        self.S = self.S + record * (prob - int(branch_is_taken))
-        self.weight = (1 - self.alpha *  self.gamma ) * self.weight - self.gamma * self.S
-
-        return prediction == branch_is_taken
-
-    def vectorize_dim(self, x):
-        record = [0 for i in range(self.dim) ]
+        x = self.branch_history
+        power = 0 
         for i in range(self.dim):
-            extracted = (x) & 1
+            self.record[i] = (x) & 1
             x = x >> 1
-            record[i] = extracted
-        record = np.array(record)
-        return record
+            power += -1 * self.record[i] * self.weight[i]
+            
+        prob = 1/(1 + e ** power)
+        prediction = prob >= 0.5 
+        for i in range(self.dim):
+            self.S[i] = self.S[i] + self.record[i] * (prob - int(branch_is_taken))
+            self.weight[i] = (1 - self.alpha *  self.gamma ) * self.weight[i] - self.gamma * self.S[i]
+        return prediction == branch_is_taken
 
     def make_prediction(self, address: int, branch_is_taken: bool) -> bool:
         prediction_is_correct = self.make_model_prediction(branch_is_taken, address)
         self.update_history(branch_is_taken)
         return prediction_is_correct
         
+class Running_Perceptron(Running_logistic):
+    # https://courses.cs.washington.edu/courses/cse446/17wi/slides/online-perceptron-annotated.pdf
+    def __init__(self, n: int) -> None:
+        self.branch_history = 0
+        self.dim = n
+        self.nth_bit_from_the_right = 1 << (n-1)
+        self.weight = [0 for _ in range(n)]
+        self.record = [0 for _ in range(n)]
         
+    def make_model_prediction(self, branch_is_taken, address=None):    
+        x = self.branch_history
+        label = 2 * int(branch_is_taken) -1 
+
+        pred = 0 
+        for i in range(self.dim):
+            self.record[i] = (x) & 1
+            x = x >> 1
+            pred += self.record[i] * self.weight[i]
+            
+        prediction = pred >= 0 
+        if pred * label <= 0:
+            for i in range(self.dim):
+                self.weight[i] += self.record[i] * label
+        return prediction == branch_is_taken
+            
     
     
 

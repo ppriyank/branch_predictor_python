@@ -1,7 +1,8 @@
 from time import perf_counter
 import os
 from typing import List, Tuple
-from branch_predictor import Smith, Bimodal, GShare, Hybrid, YehPatt, Tage, GShare_ML, PShare, Tournament, run_predictor, load_instructions, S_Clustering, Running_logistic
+from branch_predictor import (Smith, Bimodal, GShare, Hybrid, YehPatt, Tage, GShare_ML, PShare, Tournament, run_predictor, load_instructions, 
+    S_Clustering, Running_logistic, NN_Clustering, Running_Perceptron)
 from tqdm import tqdm
 
 TRACE_FILES = 'gcc_trace.txt', 'jpeg_trace.txt', 'perl_trace.txt'
@@ -14,8 +15,8 @@ headers = ['Tracefile', 'Predictor', 'Predictor Arguments', 'Misprediction Rate'
 default_algorithms =["Smith", "Bimodal", "TAGE", "YehPatt", "GShare", "Hybrid"]
 eddy = ["PShare", "Tournament"]
 simple_ml = ["running_mean", "running_mean2", "nearest_neighbour", "nearest_neighbour2"]
-clustering_ml = ["skmean2", "skmean"]
-not_sure = ["ALMA", "Perceptron", "logistic"]
+running_ml = ["logistic", "skmean2", "skmean", "nearest_neighbour3"]
+not_sure = ["ALMA", "Perceptron"]
 
 if not os.path.isfile(OUTPUT_FILE):
     header_line = ','.join(headers)
@@ -167,7 +168,11 @@ if __name__ == "__main__":
             run_benchmark(NN_Clustering, (counter_bits))
     
     if "logistic" in to_run:
-        for counter_bits in tqdm(range(1, 20), desc="Nearest Pattern 3"):
+        for counter_bits in tqdm(range(1, 20,2), desc="Nearest Pattern 3"):
+            run_benchmark(Running_logistic, (counter_bits, 0.9, 0.1))
+    
+    if "perceptron" in to_run:
+        for counter_bits in tqdm(range(1, 20,2), desc="Nearest Pattern 3"):
             run_benchmark(Running_logistic, (counter_bits, 0.9, 0.1))
 
     # ### GShare: logistic ###
@@ -177,22 +182,6 @@ if __name__ == "__main__":
     # ### GShare: logistic 2 ###
     # for args in tqdm(gshare_args, desc="GShare_ML Logistic 2"):
     #     run_benchmark(GShare_ML, (*args, "logistic2"))
-    
-    # ### GShare: Perceptron ###
-    # for args in tqdm(gshare_args, desc="GShare_ML Perceptron"):
-    #     run_benchmark(GShare_ML, (*args, "Perceptron"))
-
-    # ### GShare: Perceptron 2 ###
-    # for args in tqdm(gshare_args, desc="GShare_ML Perceptron 2"):
-    #     run_benchmark(GShare_ML, (*args, "Perceptron2"))
-    
-    # ### GShare: ALMA ###
-    # for args in tqdm(gshare_args, desc="GShare_ML ALMA"):
-    #     run_benchmark(GShare_ML, (*args, "ALMA"))
-    
-    # ### GShare: ALMA 2 ###
-    # for args in tqdm(gshare_args, desc="GShare_ML ALMA 2"):
-    #     run_benchmark(GShare_ML, (*args, "ALMA2"))
     
     
 # python benchmarks.py
