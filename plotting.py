@@ -20,21 +20,23 @@ plotting_x = "Runtime"
 plotting_size = "Accuracy"
 
 OPACITY = 0.90
-THRESHOLD = 0.04
+THRESHOLD = 0.05
 TRACE_FILES = 'gcc_trace.txt', 'jpeg_trace.txt', 'perl_trace.txt'
 REPETITIONS = 20
-baselines = ["benchmarks5.csv", "benchmarks6.csv"]
+THRESHOLD_TIME = 10
+baselines = ["benchmarks5.csv", "benchmarks6.csv", "benchmarks13.csv", "benchmarks12.csv"]
 # baselines = ["benchmarks6.csv"]
 
-Ignored_algorithms = ["GShare_ML-running_mean", "GShare_ML-nearest_pattern2","GShare_ML-logistic2" ]
+Ignored_algorithms = ["GShare_ML-running_mean", "GShare_ML-nearest_pattern2", "GShare_ML-logistic2",
+    "Tournament", "GShare_ML-logistic"  ]
+
 columns=["Tracefile", "Predictor", "Predictor Arguments", "Misprediction Rate", "Accuracy",
 "Precision", "Recall", "F1", "Runtime", "TP", 
 "TN", "FP", "FN", 'Size']
 
 colors = ["blue", "green", "orange", "red", "purple", 
-    "yellow", 
-    "navy", "cyan", "lime", "crimson", "violet", 
-    "gold", "deeppink", "peru", "orangered", "teal", "dodgerblue", "black", 
+    "yellow", "navy", "cyan", "lime", "dodgerblue", "violet", 
+    "gold", "deeppink", "peru", "orangered", "teal", "dodgerblue","crimson",  "black", 
     "fuchsia", "aqua", ]
 
 metrics = ["Accuracy", "Misprediction Rate", 'F1', 'Runtime', "Predictor Arguments"]
@@ -74,6 +76,17 @@ def indicator(x):
     else:
         return int(x)
 
+def handle_running_algorithm(x):
+    if "Running" not in x['Predictor']:
+        return x
+    if len(x["Predictor Arguments"].split(",")) == 3:
+        splits = x["Predictor Arguments"].split(",")
+        splits = [float(e.strip()) for e in splits]
+        x["Predictor Arguments"] =str(int(splits[0]))
+        return x
+    else:
+        return x
+
 def handle_ml(x):
     # print(x["Predictor Arguments"].split(","), )
     if len(x["Predictor Arguments"].split(",")) == 3:
@@ -83,6 +96,8 @@ def handle_ml(x):
     else:
         return x
 
+
+results = results.apply(handle_running_algorithm, axis=1)
 results = results.apply(handle_ml, axis=1)
 Runtime =  {}     
 Weights = {}
@@ -100,7 +115,7 @@ for trace in TRACE_FILES:
         Vals_X_to_be_plotted = []  
         Runtime[trace][algo] = {}
         algorithms_trace = trace_results[trace_results.Predictor == algo]
-        if algo != "PShare":
+        if algo != "PShare" and algo != 'S_Clustering-skmean':
             assert (algorithms_trace.groupby(['Predictor Arguments']).count().FN == REPETITIONS).all()
         # filtered_df = algorithms_trace[metrics].groupby(['args_string']).mean()
         filtered_df = algorithms_trace[metrics].groupby(['Predictor Arguments']).agg(custom_average)
@@ -112,6 +127,8 @@ for trace in TRACE_FILES:
             vals = filtered_df[filtered_df.index == args].to_dict(orient='list')
             curr_y = vals[plotting_y][0]
             curr_x = vals[plotting_x][0]
+            if curr_x > THRESHOLD_TIME:
+                continue 
             if Vals_Y_to_be_plotted != []:
                 closest_y = Vals_Y_to_be_plotted[min(range(len(Vals_Y_to_be_plotted)), key = lambda i: abs(Vals_Y_to_be_plotted[i]-curr_y))]
                 closest_x = Vals_X_to_be_plotted[min(range(len(Vals_X_to_be_plotted)), key = lambda i: abs(Vals_X_to_be_plotted[i]-curr_x))]
@@ -162,7 +179,7 @@ def plotting1():
         
 
 
-def plotting2():
+def plotting2(fading=False):
     for trace in TRACE_FILES:
         plt.grid(alpha=0.5)
         # plt.rcParams['font.size'] = 8
@@ -177,23 +194,25 @@ def plotting2():
                 Y = Runtime[trace][algo][args][plotting_y][0]
                 X = Runtime[trace][algo][args][plotting_x][0]
                 Z = Runtime[trace][algo][args][plotting_size][0]
-                # opacity = indicator(args)
+                opacity = indicator(args)
                 label = algo + " " + args
-                area = max((500 * Z**2), 100)
-                # plt.scatter(X, Y, s=area, c=colors[i], alpha=min(Weights[trace][algo] / opacity, 1), edgecolors='black')    
-                plt.scatter(X, Y, s=area, c=colors[i], alpha=OPACITY, edgecolors='black')    
+                area = max((800 * Z**2), 100)
+                if fading:
+                    plt.scatter(X, Y, s=area, c=colors[i], alpha=min(Weights[trace][algo] / opacity, 1), edgecolors='black')    
+                else:
+                    plt.scatter(X, Y, s=area, c=colors[i], alpha=OPACITY, edgecolors='black')    
             h = Line2D([0], [0], marker='o', markersize=np.sqrt(100), color=colors[i], linestyle='None', alpha=OPACITY, markeredgecolor='black')
             legends.append(h)
         plt.legend(legends, labels, loc="lower right", markerscale=2, scatterpoints=0, fontsize=20)
-        plt.title("BenchMarking: " + r"$\bf{" + str(trace.replace("_", "\_")) + "}$" + f", Thres. skip {THRESHOLD}")
+        plt.title("BenchMarking: " + r"$\bf{" + str(trace.replace("_", "\_")) + "}$" + f", Thres. skip {THRESHOLD}, t <{THRESHOLD_TIME}s")
         plt.xlabel("Runtime (seconds) (Avg of 20 runs)")
         plt.ylabel(f"{plotting_y} Scores")
-        plt.savefig(f"{trace}.png")
+        plt.savefig(f"{trace}_F={fading}.png")
         plt.clf()  
         
 
-
-plotting2()
+plotting2(fading=False)
+plotting2(fading=True)
 
 # conda activate bert
 # python plotting.py

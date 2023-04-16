@@ -1,3 +1,4 @@
+Tracefile,Predictor,Predictor Arguments,Misprediction Rate,Accuracy,Precision,Recall,F1,Runtime,TP,TN,FP,FN,Size
 gcc_trace.txt,S_Clustering,"1, 2, skmean",43.45,0.5655,0.5645,0.5442,0.5541,21.74,540062,590907,416628,452403,4
 gcc_trace.txt,S_Clustering,"1, 2, skmean",43.45,0.5655,0.5645,0.5442,0.5541,21.66,540062,590907,416628,452403,4
 gcc_trace.txt,S_Clustering,"1, 2, skmean",43.45,0.5655,0.5645,0.5442,0.5541,21.68,540062,590907,416628,452403,4
