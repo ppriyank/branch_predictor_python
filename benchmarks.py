@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 TRACE_FILES = 'gcc_trace.txt', 'jpeg_trace.txt', 'perl_trace.txt'
 INSTRUCTIONS = [load_instructions(file) for file in TRACE_FILES]
-OUTPUT_FILE = 'benchmarks13.csv'
+OUTPUT_FILE = 'benchmarks14.csv'
 REPETITIONS = 20
 
 headers = ['Tracefile', 'Predictor', 'Predictor Arguments', 'Misprediction Rate', 'Accuracy', 'Precision', 'Recall', 'F1', 'Runtime', 'TP', 'TN', 'FP', 'FN', 'Size']
@@ -73,7 +73,7 @@ def run_benchmark(predictor_class, predictor_args: tuple):
             continue
 
 # to_run = default_algorithms + eddy + simple_ml + clustering_ml
-to_run = running_ml[:-2]
+to_run = ["GShare_Perceptron"]
 
 if __name__ == "__main__":
     if "Smith" in to_run:
@@ -172,13 +172,13 @@ if __name__ == "__main__":
     
     if "perceptron" in to_run:
         for counter_bits in tqdm(range(1, 20,2), desc="Perceptron"):
-            run_benchmark(Running_Perceptron, (counter_bits))
+            run_benchmark(Running_Perceptron, (counter_bits,))
 
     if "GShare_Perceptron" in to_run:
         ### GShare: Perceptron ###
         for args in tqdm(gshare_args, desc="GShare Perceptron"):
-            run_benchmark(GShare_Perceptron, (*args))
-
+            run_benchmark(GShare_Perceptron, args)
+        
     # ### GShare: logistic ###
     # for args in tqdm(gshare_args, desc="GShare_ML Logistic"):
     #     run_benchmark(GShare_ML, (*args, "logistic"))
