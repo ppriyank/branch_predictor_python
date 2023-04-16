@@ -6,38 +6,40 @@ import matplotlib as mpl
 from matplotlib.lines import Line2D
 import functools
 
-plt.rcParams['xtick.labelsize'] = 32
-plt.rcParams['ytick.labelsize'] = 32
-plt.rcParams['font.size'] = 32
+FONTSIZE = 50
+plt.rcParams['xtick.labelsize'] = FONTSIZE
+plt.rcParams['ytick.labelsize'] = FONTSIZE
+plt.rcParams['font.size'] = FONTSIZE
 plt.rcParams['axes.labelsize'] = 'large'
 plt.rcParams["legend.labelspacing"] = 0.4
 plt.rcParams["legend.labelcolor"] = "black"
 plt.rcParams["legend.edgecolor"] = "black"
-plt.figure(figsize=(20, 20))
+plt.figure(figsize=(55, 30))
 
-plotting_y = "F1"
+# plotting_y = "F1"
+plotting_y = "Accuracy"
 plotting_x = "Runtime"
 plotting_size = "Accuracy"
 
+EPSILON = 0.01
 OPACITY = 0.90
-THRESHOLD = 0.05
+THRESHOLD = 0.02
 TRACE_FILES = 'gcc_trace.txt', 'jpeg_trace.txt', 'perl_trace.txt'
 REPETITIONS = 20
 THRESHOLD_TIME = 10
-baselines = ["benchmarks5.csv", "benchmarks6.csv", "benchmarks13.csv", "benchmarks12.csv"]
-# baselines = ["benchmarks6.csv"]
+IGNORE_ALL = True
+baselines = ["benchmarks5.csv", "benchmarks6.csv", "benchmarks11.csv", "benchmarks13.csv", "benchmarks12.csv"]
 
 Ignored_algorithms = ["GShare_ML-running_mean", "GShare_ML-nearest_pattern2", "GShare_ML-logistic2",
-    "Tournament", "GShare_ML-logistic"  ]
+    "Tournament", "GShare_ML-logistic", "PShare"  ]
 
 columns=["Tracefile", "Predictor", "Predictor Arguments", "Misprediction Rate", "Accuracy",
 "Precision", "Recall", "F1", "Runtime", "TP", 
 "TN", "FP", "FN", 'Size']
 
-colors = ["blue", "green", "orange", "red", "purple", 
-    "yellow", "navy", "cyan", "lime", "dodgerblue", "violet", 
-    "gold", "deeppink", "peru", "orangered", "teal", "dodgerblue","crimson",  "black", 
-    "fuchsia", "aqua", ]
+colors = ["blue", "green", "teal", "red", "purple", "violet", "navy", 
+    "cyan", "deeppink", "dodgerblue", "peru", "lime", 
+    "black", "gold", "aqua", "fuchsia", "crimson", "orangered", "yellow", "orange"]
 
 metrics = ["Accuracy", "Misprediction Rate", 'F1', 'Runtime', "Predictor Arguments"]
 results = pd.read_csv(baselines[0])
@@ -54,9 +56,11 @@ def compare(x,y):
         if x[0] == y[0]:
             if x[1] != y[1]:
                 return int(x[1]) - int(y[1])
+            elif x[2] != y[2]:
+                return int(x[2]) - int(y[2])
             else:
-                import pdb
-                pdb.set_trace()    
+                if x[3] != y[3]:
+                    return int(x[3]) - int(y[3])
         else:
             return int(x[0]) - int(y[0])
     else:
@@ -102,6 +106,9 @@ results = results.apply(handle_ml, axis=1)
 Runtime =  {}     
 Weights = {}
 for trace in TRACE_FILES:
+    if IGNORE_ALL:
+        if len(Runtime) > 1:
+            break 
     Weights[trace] = {}
     Runtime[trace] = {}
     trace_results = results[results["Tracefile"] == trace]
@@ -109,6 +116,10 @@ for trace in TRACE_FILES:
     for algo in algorithms:
         if algo in Ignored_algorithms:
             continue 
+        if IGNORE_ALL:
+            if len(Runtime[trace]) > 1:
+                break 
+
         print(f"\n\n {algo} \n\n")
         Weights[trace][algo] = 1000
         Vals_Y_to_be_plotted = []  
@@ -133,6 +144,7 @@ for trace in TRACE_FILES:
                 closest_y = Vals_Y_to_be_plotted[min(range(len(Vals_Y_to_be_plotted)), key = lambda i: abs(Vals_Y_to_be_plotted[i]-curr_y))]
                 closest_x = Vals_X_to_be_plotted[min(range(len(Vals_X_to_be_plotted)), key = lambda i: abs(Vals_X_to_be_plotted[i]-curr_x))]
                 diff = abs(closest_y - curr_y) + abs(closest_x - curr_x)
+                diff = abs(closest_y - curr_y) 
                 if diff < THRESHOLD:
                     continue
             Vals_Y_to_be_plotted.append(curr_y)
@@ -178,7 +190,6 @@ def plotting1():
         plt.clf()  
         
 
-
 def plotting2(fading=False):
     for trace in TRACE_FILES:
         plt.grid(alpha=0.5)
@@ -189,30 +200,92 @@ def plotting2(fading=False):
             Y = []
             X = []
             Z = []
-            labels.append(algo)
+            count = 0 
             for args in Runtime[trace][algo].keys():
-                Y = Runtime[trace][algo][args][plotting_y][0]
-                X = Runtime[trace][algo][args][plotting_x][0]
+                count += 1
+                y = Runtime[trace][algo][args][plotting_y][0]
+                x = Runtime[trace][algo][args][plotting_x][0]
                 Z = Runtime[trace][algo][args][plotting_size][0]
+                X.append(x)
+                Y.append(y)
                 opacity = indicator(args)
                 label = algo + " " + args
-                area = max((800 * Z**2), 100)
+                area = max((3000 * Z**2), 200)
                 if fading:
-                    plt.scatter(X, Y, s=area, c=colors[i], alpha=min(Weights[trace][algo] / opacity, 1), edgecolors='black')    
+                    plt.scatter(x, y, s=area, c=colors[i], alpha=min(Weights[trace][algo] / opacity, 1), edgecolors='black')    
                 else:
-                    plt.scatter(X, Y, s=area, c=colors[i], alpha=OPACITY, edgecolors='black')    
-            h = Line2D([0], [0], marker='o', markersize=np.sqrt(100), color=colors[i], linestyle='None', alpha=OPACITY, markeredgecolor='black')
-            legends.append(h)
-        plt.legend(legends, labels, loc="lower right", markerscale=2, scatterpoints=0, fontsize=20)
+                    plt.scatter(x, y, s=area, c=colors[i], alpha=OPACITY, edgecolors='black')    
+            if count != 0:
+                labels.append(algo + f' ({max(Y):.2f}) ')
+                h = Line2D([0], [0], marker='o', markersize=np.sqrt(100), color=colors[i], linestyle='None', alpha=OPACITY, markeredgecolor='black')
+                legends.append(h)
+                plt.plot(X, Y, '-', alpha=OPACITY /2, color=colors[i])
+        # plt.legend(legends, labels, loc="lower right", markerscale=2, scatterpoints=0, fontsize=20)
+        plt.legend(legends, labels, loc="lower right", markerscale=5, scatterpoints=0, fontsize=FONTSIZE, bbox_to_anchor=(1.44, 0))
+        
         plt.title("BenchMarking: " + r"$\bf{" + str(trace.replace("_", "\_")) + "}$" + f", Thres. skip {THRESHOLD}, t <{THRESHOLD_TIME}s")
         plt.xlabel("Runtime (seconds) (Avg of 20 runs)")
         plt.ylabel(f"{plotting_y} Scores")
+        plt.subplots_adjust(right=0.7, left=0.05, top=0.9)
+        # plt.tight_layout()
         plt.savefig(f"{trace}_F={fading}.png")
         plt.clf()  
         
 
-plotting2(fading=False)
-plotting2(fading=True)
+def line_eq(x_0, y_0, x_1, y_1):
+    print(x_0, y_0, x_1, y_1)
+    if x_0 == x_1:
+        return lambda x: (y_0 + y_1) / 2 + EPSILON
+    else:        
+        m  = (y_0 - y_1) / (x_0 - x_1)
+        b = y_1 - m * x_1
+        return lambda x: m * x + b 
+
+def plotting3(fading=False):
+    for trace in TRACE_FILES:
+        plt.grid(alpha=0.5)
+        # plt.rcParams['font.size'] = 8
+        legends = []
+        labels = []
+        for i,algo in enumerate(Runtime[trace].keys()):
+            Y = []
+            X = []
+            Z = []
+            count = 0 
+            for args in Runtime[trace][algo].keys():
+                count += 1
+                y = Runtime[trace][algo][args][plotting_y][0]
+                x = Runtime[trace][algo][args][plotting_x][0]
+                X.append(x)
+                Y.append(y)
+                label = algo + " " + args
+                area = 3000
+                plt.scatter(x, y, s=area, c=colors[i], alpha=OPACITY, edgecolors='black')    
+            if count != 0:
+                labels.append(algo + f' ({max(Y):.2f}) ')
+                h = Line2D([0], [0], marker='o', markersize=np.sqrt(100), color=colors[i], linestyle='None', alpha=OPACITY, markeredgecolor='black')
+                legends.append(h)
+                plt.plot(X, Y, '-', alpha=OPACITY /2, color=colors[i])
+                for x_0, x_1, y_0, y_1 in zip(X[:-1], X[1:], Y[:-1], Y[1:]): 
+                    line = line_eq(x_0, y_0, x_1, y_1)
+                    mid_x = (x_0 + x_1) / 2
+                    mid_y = (y_0 + y_1) / 2
+                    plt.arrow(mid_x, mid_y, mid_x + EPSILON, line(mid_x + EPSILON) - mid_y, shape='full', lw=0, length_includes_head=True, head_width=.05)
+        # plt.legend(legends, labels, loc="lower right", markerscale=2, scatterpoints=0, fontsize=20)
+        plt.legend(legends, labels, loc="lower right", markerscale=5, scatterpoints=0, fontsize=FONTSIZE, bbox_to_anchor=(1.44, 0))
+        
+        plt.title("BenchMarking: " + r"$\bf{" + str(trace.replace("_", "\_")) + "}$" + f", Thres. skip {THRESHOLD}, t <{THRESHOLD_TIME}s")
+        plt.xlabel("Runtime (seconds) (Avg of 20 runs)")
+        plt.ylabel(f"{plotting_y} Scores")
+        plt.subplots_adjust(right=0.7, left=0.05, top=0.9)
+        # plt.tight_layout()
+        plt.savefig(f"{trace}_F={fading}.png")
+        plt.clf()  
+ 
+
+# plotting2(fading=False)
+# plotting2(fading=True)
+plotting3(fading=False)
 
 # conda activate bert
 # python plotting.py
