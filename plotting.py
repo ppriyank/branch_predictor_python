@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 from matplotlib.lines import Line2D
 import functools
+import matplotlib.patches as patches
 
 FONTSIZE = 50
 plt.rcParams['xtick.labelsize'] = FONTSIZE
@@ -27,7 +28,8 @@ THRESHOLD = 0.02
 TRACE_FILES = 'gcc_trace.txt', 'jpeg_trace.txt', 'perl_trace.txt'
 REPETITIONS = 20
 THRESHOLD_TIME = 10
-IGNORE_ALL = True
+IGNORE_ALL = False
+# IGNORE_ALL = True
 baselines = ["benchmarks5.csv", "benchmarks6.csv", "benchmarks11.csv", "benchmarks13.csv", "benchmarks12.csv"]
 
 Ignored_algorithms = ["GShare_ML-running_mean", "GShare_ML-nearest_pattern2", "GShare_ML-logistic2",
@@ -233,13 +235,57 @@ def plotting2(fading=False):
         
 
 def line_eq(x_0, y_0, x_1, y_1):
-    print(x_0, y_0, x_1, y_1)
     if x_0 == x_1:
         return lambda x: (y_0 + y_1) / 2 + EPSILON
     else:        
-        m  = (y_0 - y_1) / (x_0 - x_1)
+        m  = (y_1 - y_0) / (x_1 - x_0)
         b = y_1 - m * x_1
-        return lambda x: m * x + b 
+        return lambda x: m * x + b
+
+def add_arrow(line, position=None, direction='right', size=15, color=None, width=None, headlength=None, headwidth=None):
+    if color is None:
+        color = line.get_color()
+
+    xdata = line.get_xdata()
+    ydata = line.get_ydata()
+    
+    delta_x = (xdata[1] - xdata[0]) / 4
+    delta_y = (ydata[1] - ydata[0]) / 4
+
+    start_x = xdata[0] + delta_x
+    start_y = ydata[0] + delta_y
+    # start_x = xdata[0]
+    # start_y = ydata[0]
+
+    end_x = xdata[0] + 3 * delta_x
+    end_y = ydata[0] + 3 * delta_y
+
+    # start_ind = 0
+    # if direction == 'right':
+    #     end_ind = start_ind + 1
+    # else:
+    #     end_ind = start_ind - 1
+    # line.axes.annotate('',
+    #     xytext=(xdata[start_ind], ydata[start_ind]),
+    #     xy=(xdata[end_ind], ydata[end_ind]),
+    #     # arrowprops=dict(arrowstyle="->", color=color, width=width),
+    #     arrowprops=dict(color=color, width=width, headlength=headlength, headwidth=headwidth),
+    #     size=size
+    # )
+    # line.axes.annotate('',
+    #     xytext=(xdata[start_ind], ydata[start_ind]),
+    #     xy=(xdata.mean(), ydata.mean()),
+    #     # arrowprops=dict(arrowstyle="->", color=color, width=width),
+    #     arrowprops=dict(color=color, width=width, headlength=headlength, headwidth=headwidth, alpha=OPACITY),
+    #     size=size
+    # )
+    line.axes.annotate('',
+        xytext=(start_x, start_y),
+        xy=(end_x, end_y),
+        # arrowprops=dict(arrowstyle="->", color=color, width=width),
+        arrowprops=dict(color=color, width=width, headlength=headlength, headwidth=headwidth, alpha=OPACITY),
+        size=size
+    )
 
 def plotting3(fading=False):
     for trace in TRACE_FILES:
@@ -265,23 +311,27 @@ def plotting3(fading=False):
                 labels.append(algo + f' ({max(Y):.2f}) ')
                 h = Line2D([0], [0], marker='o', markersize=np.sqrt(100), color=colors[i], linestyle='None', alpha=OPACITY, markeredgecolor='black')
                 legends.append(h)
-                plt.plot(X, Y, '-', alpha=OPACITY /2, color=colors[i])
+                # plt.plot(X, Y, '-', alpha=OPACITY /2, color=colors[i])
                 for x_0, x_1, y_0, y_1 in zip(X[:-1], X[1:], Y[:-1], Y[1:]): 
-                    line = line_eq(x_0, y_0, x_1, y_1)
-                    mid_x = (x_0 + x_1) / 2
-                    mid_y = (y_0 + y_1) / 2
-                    plt.arrow(mid_x, mid_y, mid_x + EPSILON, line(mid_x + EPSILON) - mid_y, shape='full', lw=0, length_includes_head=True, head_width=.05)
+                    # line = line_eq(x_0, y_0, x_1, y_1)
+                    # mid_x = (x_0 + x_1) / 2
+                    # mid_y = (y_0 + y_1) / 2
+                    line = plt.plot([x_0, x_1], [y_0, y_1], '-', alpha=OPACITY /2, color=colors[i])[0]
+                    size = 25
+                    add_arrow(line, color=colors[i], size=900, width=0, headlength=size, headwidth=size)
+
         # plt.legend(legends, labels, loc="lower right", markerscale=2, scatterpoints=0, fontsize=20)
         plt.legend(legends, labels, loc="lower right", markerscale=5, scatterpoints=0, fontsize=FONTSIZE, bbox_to_anchor=(1.44, 0))
         
         plt.title("BenchMarking: " + r"$\bf{" + str(trace.replace("_", "\_")) + "}$" + f", Thres. skip {THRESHOLD}, t <{THRESHOLD_TIME}s")
         plt.xlabel("Runtime (seconds) (Avg of 20 runs)")
         plt.ylabel(f"{plotting_y} Scores")
-        plt.subplots_adjust(right=0.7, left=0.05, top=0.9)
+        plt.subplots_adjust(right=0.7, left=0.05, top=0.95, bottom=0.09)
         # plt.tight_layout()
         plt.savefig(f"{trace}_F={fading}.png")
         plt.clf()  
- 
+        if IGNORE_ALL:
+            break 
 
 # plotting2(fading=False)
 # plotting2(fading=True)
