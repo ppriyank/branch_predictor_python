@@ -25,12 +25,13 @@ plotting_size = "Accuracy"
 
 EPSILON = 0.01
 OPACITY = 0.90
-# THRESHOLD = 0.02
-THRESHOLD = 0 
+THRESHOLD = 0.02
+# THRESHOLD = 0 
 SIZE_THRESHOLD = 0.05
 TRACE_FILES = 'gcc_trace.txt', 'jpeg_trace.txt', 'perl_trace.txt'
 REPETITIONS = 20
-THRESHOLD_TIME = 30
+THRESHOLD_TIME = 7
+MAX_SIZE=20
 IGNORE_ALL = False
 # IGNORE_ALL = True
 # read_default_data = True
@@ -409,7 +410,7 @@ def plotting4():
         print(max_ratio_algo)
     return Ratios
 
-def plotting5(FINAL_DF, y_axis_label="acc"):
+def plotting5(FINAL_DF, y_axis_label="acc", use_legend=False):
     plt.figure(figsize=(35, 30))
     for trace in TRACE_FILES:
         plt.grid(alpha=0.5)
@@ -439,11 +440,12 @@ def plotting5(FINAL_DF, y_axis_label="acc"):
                 plt.plot(X_clean, Y_clean, 'o--', color=colors[i], label=algo, markersize=20, linewidth =5, markeredgecolor='black')
             else:
                 plt.plot(X_clean, Z_clean, 'o--', color=colors[i], label=algo, markersize=20, linewidth =5, markeredgecolor='black')
-
-        plt.legend()
+        
+        if use_legend:
+            plt.legend()
         # plt.legend(legends, labels, loc="lower right", markerscale=5, scatterpoints=0, fontsize=FONTSIZE, bbox_to_anchor=(1.44, 0))
         
-        plt.title("BenchMarking: " + r"$\bf{" + str(trace.replace("_", "\_")) + "}$" + f", Thres. skip {SIZE_THRESHOLD}, t <{THRESHOLD_TIME}s")
+        plt.title("BenchMarking: " + r"$\bf{" + str(trace.replace("_", "\_")) + "}$" + f", Thres. skip {SIZE_THRESHOLD}, Log2 (Size) <{MAX_SIZE}")
         plt.xlabel("Log2 (Size)")
         if y_axis_label == "acc":
             plt.ylabel(f"{plotting_y} Scores")
@@ -473,7 +475,8 @@ if read_default_data:
 FINAL_DF = pd.read_csv("size.csv")
 FINAL_DF = FINAL_DF.sort_values(by=['Size'])
 FINAL_DF.Size = np.log(FINAL_DF.Size) / np.log(2)
-FINAL_DF = FINAL_DF[FINAL_DF.Size < THRESHOLD_TIME ]
+FINAL_DF = FINAL_DF[FINAL_DF.Size < MAX_SIZE ]
 
-plotting5(FINAL_DF, y_axis_label="ratio")
-# plotting5(FINAL_DF)
+# plotting5(FINAL_DF, y_axis_label="ratio", use_legend=True)
+plotting5(FINAL_DF, y_axis_label="ratio", use_legend=False)
+# plotting5(FINAL_DF, use_legend=False)
