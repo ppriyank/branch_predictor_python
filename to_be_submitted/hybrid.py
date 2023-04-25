@@ -1,5 +1,5 @@
 import sys
-from branch_predictor import Hybrid, run_predictor
+from baseline_predictors import Hybrid, run_predictor
 
 QUIET = False
 

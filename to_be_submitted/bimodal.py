@@ -1,5 +1,5 @@
 import sys
-from branch_predictor import Bimodal, run_predictor
+from baseline_predictors import Bimodal, run_predictor
 
 QUIET = False
 

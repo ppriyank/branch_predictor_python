@@ -1,5 +1,5 @@
 import sys
-from branch_predictor import GShare, run_predictor
+from baseline_predictors import GShare, run_predictor
 
 QUIET = False
 
