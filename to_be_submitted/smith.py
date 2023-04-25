@@ -1,5 +1,5 @@
 import sys
-from branch_predictor import Smith, run_predictor
+from baseline_predictors import Smith, run_predictor
 
 counter_bits = int(sys.argv[1])
 trace_file = sys.argv[2]
